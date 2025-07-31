@@ -82,6 +82,7 @@ export const STATUS_MESSAGE = {
     USER_PROFILE: "User profile fetched successfully",
     OTP_SEND: "OTP has been sent successfully. Please check your email.",
     OTP_VERIFIED: "OTP verified successfully",
+    USER_UPDATED: "User profile updated successfully",
     NEWSLETTER_SUBSCRIBED: "Newsletter subscribed successfully",
     ERROR_MESSAGE: {
       ID_REQUIRED: "Customer Id required",

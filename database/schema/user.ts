@@ -19,6 +19,7 @@ class User extends Model<UserInterface> implements UserInterface {
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
   public deletedAt?: Date;
+  static findUserData: (id: number) => Promise<UserInterface | null>;
 }
 
 User.init(
@@ -68,5 +69,13 @@ User.init(
   },
   { ...BaseModel.initBaseOptions(sequelize), tableName: TABLE_NAME.USER }
 );
+
+User.findUserData = async (id) => 
+  User.findOne({
+    where: {
+      id,
+      deletedAt: null,
+    },
+  });
 
 export default User;

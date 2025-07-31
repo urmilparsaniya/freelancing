@@ -2,7 +2,7 @@ require("dotenv").config();
 import { STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
 import { compare } from "bcrypt";
 import jwt from "jsonwebtoken";
-import { AuthResponse, UserInterface } from "../../interface/user";
+import { AuthResponse, userAuthenticationData, UserInterface } from "../../interface/user";
 import User from "../../database/schema/user";
 const jwtSecret = process.env.JWT_SECRET || "";
 const AccessTokenExpiration = process.env.ACCESS_TOKEN_EXPIRATION || "";
@@ -46,6 +46,45 @@ class userAuthService {
       status: STATUS_CODES.SUCCESS,
       message: STATUS_MESSAGE.USER.USER_LOGIN,
     };
+  }
+
+  // Get user authentication data
+  static async getUserAuthData(loginToken: string): Promise<UserInterface | null> {
+    if (!loginToken) {
+      return null;
+    }
+    let adminData = await User.findOne({
+      where: {
+        login_token: loginToken,
+        deletedAt: null,
+      },
+    });
+    return adminData || null;
+  }
+
+  // Update user profile
+  static async updateUserProfile(data: UserInterface, userData: userAuthenticationData): Promise<AuthResponse> {
+    // check if valid user
+    let isUser = await User.findOne({
+      where: {
+        id: userData.id,
+        deletedAt: null,
+      },
+    });
+    if (!isUser) {
+      return {
+        status: STATUS_CODES.NOT_FOUND,
+        message: STATUS_MESSAGE.USER.ERROR_MESSAGE.USER_NOT_FOUND,
+      };
+    }
+    // update user data
+    await User.update(data, { where: { id: isUser.id } });
+    let userData_ = await User.findUserData(isUser.id);
+    return {
+      data: userData_,
+      status: STATUS_CODES.SUCCESS,
+      message: STATUS_MESSAGE.USER.USER_UPDATED,
+    }
   }
 }
 

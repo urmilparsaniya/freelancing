@@ -9,6 +9,7 @@ import userAuthController from "../../controller/v1/user";
 const authenticator = new Authenticator();
 const authenticateUser = authenticator.authenticateUser;
 
+// Login route
 router
   .route("/login")
   .post(
@@ -24,5 +25,15 @@ router
     ]),
     userAuthController.login
   );
+
+// Get user profile route
+router
+  .route("/profile")
+  .get(authenticateUser, userAuthController.getUserProfile);
+
+// Update user profile route
+router
+  .route("/update")
+  .put(authenticateUser, userAuthController.updateUserProfile);
 
 export default router;

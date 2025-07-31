@@ -19,3 +19,14 @@ export interface UserInterface {
   updatedAt?: Date;
   deletedAt?: Date;
 }
+
+export interface userAuthenticationData {
+  id?: number;
+  name?: string;
+  surname?: string;
+  email?: string;
+  role?: number;
+  phone_number?: string;
+  phone_code?: string;
+  data?: string;
+}

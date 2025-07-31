@@ -13,7 +13,7 @@ export class Authenticator {
       return;
     }
     //@ts-ignore
-    let userData = await AuthService.getAdminAuthData(loginToken);
+    let userData = await AuthService.getUserAuthData(loginToken);
     if (!userData) {
       res.handler.errorResponse(
         STATUS_CODES.EXPECTATION_FAILED,
@@ -22,7 +22,7 @@ export class Authenticator {
       return;
     }
     //@ts-ignore
-    req.adminInfo = userData;
+    req.userInfo = userData;
     userData = JSON.parse(JSON.stringify(userData))
     // @ts-ignore
     req.headers["user_info"] = userData;
