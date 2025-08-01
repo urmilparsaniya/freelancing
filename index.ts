@@ -8,10 +8,14 @@ import ResponseHandler from "./configs/responseHandler";
 import appRoutes from './routes';
 import session from 'express-session';
 // import passport from './configs/passport';
+import type { File as MulterFile } from 'multer';
 
 declare module "express" {
   interface Response {
     handler: any;
+  }
+  interface Request {
+    file?: MulterFile; // Optional file property for multer
   }
 }
 

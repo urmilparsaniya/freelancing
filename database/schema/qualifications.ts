@@ -1,0 +1,55 @@
+import { Model, Sequelize } from "sequelize";
+import { DataTypes } from "sequelize";
+const { sequelize } = require("../../configs/database");
+import BaseModel from "./base";
+import { TABLE_NAME } from "../../configs/tables";
+import { QualificationsInterface } from "../../interface/qualifications";
+import Units from "./units";
+
+class Qualifications
+  extends Model<QualificationsInterface>
+  implements QualificationsInterface
+{
+  public id!: number;
+  public name!: string;
+  public qualification_no!: string;
+  public created_by!: number;
+  public status!: number;
+  // timestamps!
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+  public deletedAt?: Date;
+}
+
+Qualifications.init(
+  {
+    ...BaseModel.initBaseModel(sequelize),
+    name: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    qualification_no: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+    },
+    created_by: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    status: {
+      type: DataTypes.INTEGER,
+      comment: "1: Active, 2: Inactive",
+      defaultValue: 1,
+    },
+  },
+  {
+    ...BaseModel.initBaseOptions(sequelize),
+    tableName: TABLE_NAME.QUALIFICATIONS,
+  }
+);
+
+Qualifications.hasMany(Units, { foreignKey: 'qualification_id', as: 'units' });
+Units.belongsTo(Qualifications, { foreignKey: 'qualification_id', as: 'qualification' });
+
+export default Qualifications;

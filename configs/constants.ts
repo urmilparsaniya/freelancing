@@ -75,6 +75,9 @@ export const STATUS_CODES = {
 };
 
 export const STATUS_MESSAGE = {
+  ERROR_MESSAGE: {
+    INTERNAL_SERVER_ERROR: "Internal Server Error"
+  },
   USER: {
     USER_LOGIN: "Login successful!",
     USER_INFO: "User data fetch successfully",
@@ -117,91 +120,14 @@ export const STATUS_MESSAGE = {
       DEFAULT_ADDRESS_ALREADY_SET: "Default address already set",
     }
   },
-  PRODUCT: {
-    PRODUCT_CREATE: "Product created successfully",
-    PRODUCT_UPDATE: "Product updated successfully",
-    PRODUCT_DELETE: "Product deleted successfully",
-    PRODUCT_LIST: "Product list fetched successfully",
-    PRODUCT_DETAILS: "Product details fetched successfully",
+  QUALIFICATION: {
+    CREATED: "Qualification created successfully",
     ERROR_MESSAGE: {
-      PRODUCT_NOT_FOUND: "Product not found",
-      PRODUCT_EXIST: "Product already exist",
-      PRODUCT_NAME_REQUIRED: "Product name required",
-      PRODUCT_PRICE_REQUIRED: "Product price required",
-      PRODUCT_DESCRIPTION_REQUIRED: "Product description required",
-      PRODUCT_ID_REQUIRED: "Product Id required",
-      PRODUCT_ID_OR_SLUG_REQUIRED: "Either 'product_id' or 'slug' is required to identify the product"
+      QUALIFICATION_NOT_FOUND: "Qualification not found",
+      QUALIFICATION_ID_REQUIRED: "Qualification Id required",
+      QUALIFICATION_ALREADY_EXIST: "Qualification already exist",
+      QUALIFICATION_REQUIRED: "Qualification required",
     }
-  },
-  COUPON: {
-    COUPON_CREATE: "Coupon created successfully",
-    COUPON_UPDATE: "Coupon updated successfully",
-    COUPON_DELETE: "Coupon deleted successfully",
-    COUPON_LIST: "Coupon list fetched successfully",
-    COUPON_DETAILS: "Coupon details fetched successfully",
-    COUPON_STATUS_UPDATE: "Coupon status updated successfully",
-    ERROR_MESSAGE: {
-      COUPON_NOT_FOUND: "Coupon not found",
-      COUPON_EXIST: "Coupon already exist",
-      CODE_REQUIRED: "Coupon code required",
-      TITLE_REQUIRED: "Coupon title required",
-      DISCOUNT_TYPE_INVALID: "Invalid discount type",
-      CODE_EXISTS: "Coupon code already exists",
-      VALUE_REQUIRED: "Coupon value required",
-    }
-  },
-  NOTIFY_ME: {
-    NOTIFY_ME_CREATE: "You're all set! We'll notify you as soon as it's available.",
-    NOTIFY_ME_LIST: "Notify me list fetched successfully",
-    ERROR_MESSAGE: {
-      ALREADY_EXISTS: "You have already requested to be notified for this product.",
-      NOTIFY_ME_NOT_FOUND: "Notify me not found",
-      PRODUCT_ID_REQUIRED: "Product Id required",
-      CUSTOMER_ID_REQUIRED: "Customer Id required",
-      NOTIFY_ME_EXIST: "Notify me already exist",
-      NOTIFY_ME_ID_REQUIRED: "Notify me Id required"
-    }
-  },
-  BLOGS: {
-    BLOG_CREATE: "Blog created successfully",
-    BLOG_UPDATE: "Blog updated successfully",
-    BLOG_DELETE: "Blog deleted successfully",
-    BLOG_LIST: "Blog list fetched successfully",
-    BLOG_DETAILS: "Blog details fetched successfully",
-    ERROR_MESSAGE: {
-      BLOG_NOT_FOUND: "Blog not found",
-      BLOG_EXIST: "Blog already exist",
-      BLOG_SLUG_EXIST: "Blog slug already exist",
-      BLOG_DESCRIPTION_REQUIRED: "Blog description required",
-      BLOG_TITLE_REQUIRED: "Blog title required",
-      BLOG_ID_REQUIRED: "Blog Id required",
-      BLOG_SLUG_REQUIRED: "Blog slug required"
-    }
-  },
-  CART: {
-    CART_CREATE: "Cart created successfully",
-    CART_UPDATE: "Cart updated successfully",
-    CART_DELETE: "Cart deleted successfully",
-    CART_LIST: "Cart list fetched successfully",
-    CART_DETAILS: "Cart details fetched successfully",
-    CART_ITEM_DELETE: "Cart item deleted successfully",
-    CART_GET: "Cart fetched successfully",
-    ERROR_MESSAGE: {
-      CART_NOT_FOUND: "Cart not found",
-      CART_EXIST: "Cart already exist",
-      CART_NAME_REQUIRED: "Cart name required",
-      CART_PRICE_REQUIRED: "Cart price required",
-      CART_DESCRIPTION_REQUIRED: "Cart description required",
-      CART_ID_REQUIRED: "Cart Id required",
-      PRODUCT_ID_REQUIRED: "Product Id required",
-      QTY_REQUIRED: "Quantity required",
-      CART_ITEM_EXIST: "Cart item already exist",
-      CART_ITEM_NOT_FOUND: "Cart item not found",
-      PRODUCT_NOT_FOUND: "Product not found",
-    }
-  },
-  ACCOUNT: {
-    CREATE_ACCOUNT: "Account created successfully",
   },
   VALIDATION: {
     USER: {
