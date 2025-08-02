@@ -143,44 +143,35 @@ class qualificationService {
         units: [],
       };
 
-      for (const unit of units) {
-        const sectionsMap = new Map(); // sectionNumber => sectionData
-        //@ts-ignore
-        for (const outcome of unit.subOutcomes || []) {
-          const [sectionNumber, outcomeNumber] =
-            outcome.outcome_number.split(".");
+     for (const unit of units) {
+      const outcomes = [];
+      //@ts-ignore
+      for (const outcome of unit.subOutcomes || []) {
+        const [sectionNumber, outcomeNumber] = outcome.outcome_number.split(".");
+        const numericSection = parseInt(sectionNumber, 10).toString();
+        const numericOutcome = parseInt(outcomeNumber, 10).toString();
+        const fullOutcomeNumber = `${numericSection}.${numericOutcome}`;
 
-          const paddedSection = sectionNumber.padStart(2, "0");
-          const paddedOutcome = outcomeNumber.padStart(2, "0");
+        const outcomeEntry: any = {
+          number: fullOutcomeNumber,
+          description: outcome.description,
+        };
 
-          if (!sectionsMap.has(paddedSection)) {
-            sectionsMap.set(paddedSection, {
-              sectionNumber: paddedSection,
-              title: "", // Optional: Extract section title from description logic
-              outcomes: [],
-            });
-          }
-
-          const outcomeEntry: any = {
-            number: `${paddedSection}.${paddedOutcome}`,
-            description: outcome.description,
-          };
-
-          if (outcome.outcomeSubpoints && outcome.outcomeSubpoints.length) {
-            outcomeEntry.subPoints = outcome.outcomeSubpoints.map(
-              (p) => p.point_text
-            );
-          }
-
-          sectionsMap.get(paddedSection).outcomes.push(outcomeEntry);
+        if (outcome.outcomeSubpoints && outcome.outcomeSubpoints.length) {
+          outcomeEntry.subPoints = outcome.outcomeSubpoints.map((p) => p.point_text);
         }
 
-        result.units.push({
-          unitTitle: unit.unit_title,
-          unitNumber: unit.unit_number,
-          sections: Array.from(sectionsMap.values()),
-        });
+        outcomes.push(outcomeEntry);
       }
+
+      outcomes.sort((a, b) => this.compareOutcomeNumbers(a.number, b.number));
+
+      result.units.push({
+        unitTitle: unit.unit_title,
+        unitNumber: unit.unit_number,
+        outcomes, // 🔁 directly attached here
+      });
+    }
 
       return {
         status: STATUS_CODES.SUCCESS,
@@ -189,6 +180,36 @@ class qualificationService {
       };
     } catch (error) {
       console.error("Error retrieving qualifications:", error);
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+      };
+    }
+  }
+
+  static compareOutcomeNumbers(a: string, b: string): number {
+    const [a1, a2] = a.split(".").map(Number);
+    const [b1, b2] = b.split(".").map(Number);
+    return a1 - b1 || a2 - b2;
+  }
+
+  // Get qualifications list method
+  static async getQualificationsList(
+    userData: userAuthenticationData
+  ): Promise<any> {
+    try {
+      const qualifications = await Qualifications.findAll({
+        where: { deletedAt: null },
+        order: [["createdAt", "DESC"]],
+      });
+
+      return {
+        status: STATUS_CODES.SUCCESS,
+        data: qualifications,
+        message: "Qualifications list retrieved successfully.",
+      };
+    } catch (error) {
+      console.error("Error retrieving qualifications list:", error);
       return {
         status: STATUS_CODES.SERVER_ERROR,
         message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,

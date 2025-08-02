@@ -15,4 +15,9 @@ router
   .route("/get/:id")
   .get(authenticateUser, qualificationController.getQualifications);
 
+// Get qualifications list
+router
+  .route("/list")
+  .get(authenticateUser, qualificationController.getQualificationsList);
+
 export default router;

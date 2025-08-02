@@ -6,4 +6,5 @@ export interface QualificationsInterface {
   created_by: number;
   createdAt?: Date;
   updatedAt?: Date;
+  deletedAt?: Date;
 }
