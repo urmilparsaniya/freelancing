@@ -6,6 +6,8 @@ import Qualifications from "../../database/schema/qualifications";
 import Units from "../../database/schema/units";
 import SubOutcomes from "../../database/schema/sub_outcomes";
 import OutcomeSubpoints from "../../database/schema/outcome_subpoints";
+import { Order } from "sequelize";
+import { paginate } from "../../helper/utils";
 const { sequelize } = require("../../configs/database");
 
 class qualificationService {
@@ -195,17 +197,39 @@ class qualificationService {
 
   // Get qualifications list method
   static async getQualificationsList(
+    data: any,
     userData: userAuthenticationData
   ): Promise<any> {
     try {
-      const qualifications = await Qualifications.findAll({
+      const limit = data.limit ? +data.limit : 0;
+      const page = data.page ? +data.page : 0;
+      let offset = (page - 1) * limit;
+      let sort_by = data.sort_by || "createdAt";
+      let sort_order = data.sort_order || "ASC";
+      let order: Order = [[sort_by, sort_order]];
+
+      const fetchAll = limit === 0 || page === 0;
+
+      let qualifications = await Qualifications.findAndCountAll({
         where: { deletedAt: null },
-        order: [["createdAt", "DESC"]],
+        limit: fetchAll ? undefined : limit,
+        offset: fetchAll ? undefined : offset,
+        order,
+        distinct: true,
       });
+
+      qualifications = JSON.parse(JSON.stringify(qualifications));
+
+      const pagination = await paginate(qualifications, limit, page, fetchAll);
+
+      const response = {
+        data: qualifications.rows,
+        pagination: pagination
+      }
 
       return {
         status: STATUS_CODES.SUCCESS,
-        data: qualifications,
+        data: response,
         message: "Qualifications list retrieved successfully.",
       };
     } catch (error) {

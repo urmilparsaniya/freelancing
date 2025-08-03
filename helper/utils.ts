@@ -172,16 +172,19 @@ export const paginate = async (total, limit, page, fetchAll) => {
       totalRecords: total.count || 0,
       currentPage: 1,
       totalPages: 1,
-      limit: total.count || 0,
+      perPage: limit,
+      isNextPage: false
     };
   }
   let totalRecords = total.count || 0;
   const totalPages = limit > 0 ? Math.ceil(totalRecords / limit) : 1;
+  const isNextPage = page < totalPages;
   return {
     totalRecords: totalRecords,
     currentPage: page,
     totalPages,
-    limit,
+    perPage: limit,
+    isNextPage
   };
 };
 

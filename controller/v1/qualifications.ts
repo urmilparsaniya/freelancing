@@ -50,7 +50,8 @@ class qualificationController {
   static async getQualificationsList(req: Request, res: Response): Promise<void> {
     try {
       let userData = req.headers['user_info'] as userAuthenticationData;
-      let request = await qualificationService.getQualificationsList(userData);
+      let data = req.query as any;
+      let request = await qualificationService.getQualificationsList(data, userData);
       if (request.status !== STATUS_CODES.SUCCESS) {
         res.handler.errorResponse(request.status, request.message);
         return;

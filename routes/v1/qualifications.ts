@@ -12,7 +12,7 @@ router
 
 // Get qualification route
 router
-  .route("/get/:id")
+  .route("/detail/:id")
   .get(authenticateUser, qualificationController.getQualifications);
 
 // Get qualifications list
