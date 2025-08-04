@@ -4,6 +4,7 @@ import multer from "multer";
 import { STATUS_CODES } from "../configs/constants";
 import userRoute from "./v1/user";
 import qualificationRoute from "./v1/qualifications";
+import assessor from "./v1/assessor"
 
 dotenv.config();
 
@@ -36,4 +37,11 @@ export default (app: Application): void => {
     upload.single("file"), // Use multer
     qualificationRoute
   );
+
+  // Assessor Routes
+  app.use(
+    "/" + process.env.API_BASE_URL + "/v1/assessor",
+    upload.single("file"),
+    assessor
+  )
 };

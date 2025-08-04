@@ -9,4 +9,5 @@ export interface SubOutcomesInterface {
   created_by: number;
   createdAt?: Date;
   updatedAt?: Date;
+  deletedAt?: Date;
 }

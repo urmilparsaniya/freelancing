@@ -14,6 +14,8 @@ export interface UserInterface {
   phone_code?: string;
   email: string;
   role: number;
+  about: string;
+  trainee: boolean;
   theme_color: string; // Added theme_color field
   password: string;
   createdAt?: Date;

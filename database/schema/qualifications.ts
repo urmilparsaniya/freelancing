@@ -19,6 +19,7 @@ class Qualifications
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
   public deletedAt?: Date;
+  static findById: (id: number) => Promise<QualificationsInterface | null>
 }
 
 Qualifications.init(
@@ -51,5 +52,10 @@ Qualifications.init(
 
 Qualifications.hasMany(Units, { foreignKey: 'qualification_id', as: 'units' });
 Units.belongsTo(Qualifications, { foreignKey: 'qualification_id', as: 'qualification' });
+
+Qualifications.findById = async (id) => 
+  Qualifications.findOne({
+    where: { id, deletedAt: null }
+  })
 
 export default Qualifications;

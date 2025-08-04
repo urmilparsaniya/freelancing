@@ -20,4 +20,14 @@ router
   .route("/list")
   .get(authenticateUser, qualificationController.getQualificationsList);
 
+// Delete qualifications
+router
+  .route("/delete/:id")
+  .delete(authenticateUser, qualificationController.deleteQualification);
+
+// Update qualifications
+router
+  .route("/update/:id")
+  .put(authenticateUser, qualificationController.updateQualification);
+
 export default router;

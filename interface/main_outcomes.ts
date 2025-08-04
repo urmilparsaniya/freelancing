@@ -8,4 +8,5 @@ export interface MainOutcomesInterface {
   status: number; // 1: Active, 2: Inactive
   createdAt?: Date;
   updatedAt?: Date;
+  deletedAt?: Date;
 }

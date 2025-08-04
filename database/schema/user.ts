@@ -15,6 +15,8 @@ class User extends Model<UserInterface> implements UserInterface {
   public email!: string;
   public role!: number;
   public password!: string;
+  public about!: string;
+  public trainee!: boolean
   public theme_color!: string; // Added theme_color field
   // timestamps!
   public readonly createdAt!: Date;
@@ -62,6 +64,14 @@ User.init(
       type: DataTypes.STRING,
       allowNull: true,
       defaultValue: "primary", // Default theme color
+    },
+    about: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    trainee: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
     },
     password: {
       type: DataTypes.STRING,

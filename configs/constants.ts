@@ -161,3 +161,10 @@ export const STATUS = {
   IN_ACTIVE: 2,
   DELETE: 3,
 };
+
+export const Roles = {
+  SUPER_ADMIN: 1,
+  ASSESSOR: 2,
+  LEARNER: 3,
+  OBSERVER: 4
+}
