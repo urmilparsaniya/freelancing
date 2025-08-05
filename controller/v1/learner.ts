@@ -1,15 +1,15 @@
 import { Request, Response } from "express";
 import { STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
-import AssessorService from "../../model/v1/assessor";
 import { userAuthenticationData } from "../../interface/user";
+import LearnerService from "../../model/v1/learner";
 
-class assessorController {
-  // Create Assessor
-  static async createAssessor(req: Request, res: Response): Promise<void> {
+class learnerController {
+  // Create learner method
+  static async createLearner(req: Request, res: Response): Promise<void> {
     try {
       let data = req.body;
       let userData = req.headers["user_info"] as userAuthenticationData;
-      let request = await AssessorService.createAssessor(data, userData);
+      let request = await LearnerService.createLearner(data, userData);
       if (request.status !== STATUS_CODES.SUCCESS) {
         res.handler.errorResponse(request.status, request.message);
         return;
@@ -25,15 +25,15 @@ class assessorController {
     }
   }
 
-  // Update Assessor
-  static async updateAssessor(req: Request, res: Response): Promise<void> {
+  // Update learner method
+  static async updateLearner(req: Request, res: Response): Promise<void> {
     try {
-      let assessorId = req.params.id as string | number;
+      let learnerId = req.params.id as string | number;
       let data = req.body;
       let userData = req.headers["user_info"] as userAuthenticationData;
-      let request = await AssessorService.updateAssessor(
+      let request = await LearnerService.updateLearner(
+        learnerId,
         data,
-        assessorId,
         userData
       );
       if (request.status !== STATUS_CODES.SUCCESS) {
@@ -51,15 +51,12 @@ class assessorController {
     }
   }
 
-  // List Assessor
-  static async listAssessor(req: Request, res: Response): Promise<void> {
+  // List Learner method
+  static async listLearner(req: Request, res: Response): Promise<void> {
     try {
       let data = req.query;
       let userData = req.headers["user_info"] as userAuthenticationData;
-      let request = await AssessorService.listAssessor(
-        data,
-        userData
-      );
+      let request = await LearnerService.listLearner(data, userData);
       if (request.status !== STATUS_CODES.SUCCESS) {
         res.handler.errorResponse(request.status, request.message);
         return;
@@ -75,12 +72,13 @@ class assessorController {
     }
   }
 
-  static async deleteAssessor(req: Request, res: Response): Promise<void> {
+  // Delete Learner method
+  static async deleteLearner(req: Request, res: Response): Promise<void> {
     try {
-      let assessorId = req.params.id as string | number
+      let learnerId = req.params.id as string | number
       let userData = req.headers["user_info"] as userAuthenticationData;
-      let request = await AssessorService.deleteAssessor(
-        assessorId,
+      let request = await LearnerService.deleteLearner(
+        learnerId,
         userData
       );
       if (request.status !== STATUS_CODES.SUCCESS) {
@@ -99,4 +97,4 @@ class assessorController {
   }
 }
 
-export default assessorController;
+export default learnerController;

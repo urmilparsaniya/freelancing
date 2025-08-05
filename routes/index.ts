@@ -5,6 +5,7 @@ import { STATUS_CODES } from "../configs/constants";
 import userRoute from "./v1/user";
 import qualificationRoute from "./v1/qualifications";
 import assessor from "./v1/assessor"
+import learner from "./v1/learner"
 
 dotenv.config();
 
@@ -43,5 +44,12 @@ export default (app: Application): void => {
     "/" + process.env.API_BASE_URL + "/v1/assessor",
     upload.single("file"),
     assessor
+  )
+
+  // Learner Routes
+  app.use(
+    "/" + process.env.API_BASE_URL + "/v1/learner",
+    upload.single("file"),
+    learner
   )
 };

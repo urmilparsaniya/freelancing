@@ -17,7 +17,16 @@ class User extends Model<UserInterface> implements UserInterface {
   public role!: number;
   public password!: string;
   public about!: string;
-  public trainee!: boolean
+  public trainee!: boolean;
+  public date_of_birth!: string;
+  public address!: string;
+  public gender!: number;
+  public learning_difficulties!: boolean;
+  public off_the_job_training!: number;
+  public entitlement_date!: string;
+  public start_date!: string;
+  public expected_end_date!: string;
+  public employer!: string;
   public theme_color!: string; // Added theme_color field
   // timestamps!
   public readonly createdAt!: Date;
@@ -68,11 +77,11 @@ User.init(
     },
     about: {
       type: DataTypes.TEXT,
-      allowNull: true
+      allowNull: true,
     },
     trainee: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false
+      defaultValue: false,
     },
     password: {
       type: DataTypes.STRING,
@@ -83,19 +92,57 @@ User.init(
         this.setDataValue("password", hashedPassword);
       },
     },
+    date_of_birth: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    address: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    gender: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+      comment: "1: male | 2: female | 3: Prefer not say",
+    },
+    learning_difficulties: {
+      type: DataTypes.BOOLEAN, // Or BOOLEAN if just yes/no
+      allowNull: true,
+    },
+    off_the_job_training: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+      comment: "1: Yes | 2: no",
+    },
+    entitlement_date: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    start_date: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    expected_end_date: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    employer: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   },
   { ...BaseModel.initBaseOptions(sequelize), tableName: TABLE_NAME.USER }
 );
 
 User.belongsToMany(Qualifications, {
-  through: 'tbl_user_qualification',
-  foreignKey: 'user_id',
-  otherKey: 'qualification_id',
-  as: 'qualifications',
+  through: "tbl_user_qualification",
+  foreignKey: "user_id",
+  otherKey: "qualification_id",
+  as: "qualifications",
 });
 
-
-User.findUserData = async (id) => 
+User.findUserData = async (id) =>
   User.findOne({
     where: {
       id,

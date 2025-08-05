@@ -8,9 +8,9 @@ import Qualifications from "../../database/schema/qualifications";
 import UserQualification from "../../database/schema/user_qualification";
 const { sequelize } = require("../../configs/database");
 
-class AssessorService {
-  // Create Assessor
-  static async createAssessor(
+class LearnerService {
+  // Create Learner
+  static async createLearner(
     data: UserInterface,
     userData: userAuthenticationData
   ): Promise<any> {
@@ -27,10 +27,10 @@ class AssessorService {
           message: "Email already used",
         };
       }
-      data.role = Roles.ASSESSOR;
+      data.role = Roles.LEARNER;
       data.password = "Admin@123456";
       let createUser = await User.create(data, { transaction });
-      // Create Qualification of assessor
+      // Create Qualification of Learner
       // Parse qualifications (assuming it's a comma-separated string)
       if (!data.qualifications) {
         return {
@@ -63,7 +63,7 @@ class AssessorService {
       await transaction.commit();
       return {
         data: createUser,
-        message: "Assessor Created Successfully",
+        message: "Learner Created Successfully",
         status: STATUS_CODES.SUCCESS,
       };
     } catch (error) {
@@ -76,17 +76,17 @@ class AssessorService {
     }
   }
 
-  // Update Assessor
-  static async updateAssessor(
+  // Update Learner
+  static async updateLearner(
+    learnerId: number | string,
     data: UserInterface,
-    userId: string | number,
     userData: userAuthenticationData
   ) {
     const transaction = await sequelize.transaction();
     try {
       // Check is valid user
       let isValidUser = await User.findOne({
-        where: { id: userId, deletedAt: null },
+        where: { id: learnerId, deletedAt: null },
       });
       if (!isValidUser) {
         return {
@@ -98,7 +98,7 @@ class AssessorService {
       let isEmailUsed = await User.findOne({
         where: {
           email: data.email,
-          id: { [Op.ne]: userId },
+          id: { [Op.ne]: learnerId },
           deletedAt: null,
         },
       });
@@ -109,10 +109,11 @@ class AssessorService {
         };
       }
       await User.update(data, {
-        where: { id: userId },
+        where: { id: learnerId },
       });
 
       if (data.qualifications) {
+        console.log('work')
         const qualificationIds = data.qualifications
           .split(",")
           .map((id) => parseInt(id.trim()))
@@ -132,26 +133,26 @@ class AssessorService {
 
         // Remove old qualifications
         await UserQualification.destroy({
-          where: { user_id: userId },
+          where: { user_id: learnerId },
           force: true
         });
 
         // Insert updated qualifications
         await UserQualification.bulkCreate(
           qualificationIds.map((qid) => ({
-            user_id: +userId,
+            user_id: +learnerId,
             qualification_id: qid,
           }))
         );
       }
-      await transaction.commit()
+      await transaction.commit();
       return {
         data: {},
         status: STATUS_CODES.SUCCESS,
-        message: "Assessor Updated Successfully",
+        message: "Learner Updated Successfully",
       };
     } catch (error) {
-      await transaction.rollback()
+      await transaction.rollback();
       return {
         status: STATUS_CODES.SERVER_ERROR,
         message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
@@ -159,8 +160,8 @@ class AssessorService {
     }
   }
 
-  // List Assessor
-  static async listAssessor(data, userData: userAuthenticationData) {
+  // List Learner
+  static async listLearner(data, userData: userAuthenticationData) {
     try {
       const limit = data?.limit ? +data.limit : 0;
       const page = data?.page ? +data.page : 0;
@@ -170,7 +171,7 @@ class AssessorService {
       let order: Order = [[sort_by, sort_order]];
       const fetchAll = limit === 0 || page === 0;
       let userData_ = await User.findAndCountAll({
-        where: { deletedAt: null, role: Roles.ASSESSOR },
+        where: { deletedAt: null, role: Roles.LEARNER },
         include: [
           {
             model: Qualifications,
@@ -192,7 +193,7 @@ class AssessorService {
       return {
         status: STATUS_CODES.SUCCESS,
         data: response,
-        message: "Assessor List fetched successfully",
+        message: "Learner List fetched successfully",
       };
     } catch (error) {
       console.log(error);
@@ -203,34 +204,34 @@ class AssessorService {
     }
   }
 
-  // Delete Assessor
-  static async deleteAssessor(
-    assessorId: number | string,
+  // Delete Learner
+  static async deleteLearner(
+    learnerId: number | string,
     userData: userAuthenticationData
   ) {
     try {
-      let assessorData = await User.findOne({
-        where: { id: assessorId, deletedAt: null, role: Roles.ASSESSOR },
+      let learnerData = await User.findOne({
+        where: { id: learnerId, deletedAt: null, role: Roles.LEARNER },
         attributes: ["id"],
       });
-      if (!assessorData) {
+      if (!learnerData) {
         return {
           status: STATUS_CODES.BAD_REQUEST,
-          message: "Assessor not found",
+          message: "Learner not found",
         };
       }
-      let deleteAssessor = await User.destroy({
-        where: { id: assessorId },
+      let deleteLearner = await User.destroy({
+        where: { id: learnerId },
         force: true
       });
       let deleteUserQualification = await UserQualification.destroy({
-        where: { user_id: assessorId },
+        where: { user_id: learnerId },
         force: true
       });
       return {
         status: STATUS_CODES.SUCCESS,
         data: {},
-        message: "Assessor deleted successfully",
+        message: "Learner deleted successfully",
       };
     } catch (error) {
       console.log(error);
@@ -242,4 +243,4 @@ class AssessorService {
   }
 }
 
-export default AssessorService;
+export default LearnerService;
