@@ -21,6 +21,7 @@ export interface UserInterface {
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;
+  qualifications?: string
 }
 
 export interface userAuthenticationData {

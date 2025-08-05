@@ -5,6 +5,7 @@ import BaseModel from "./base";
 import { TABLE_NAME } from "../../configs/tables";
 import { QualificationsInterface } from "../../interface/qualifications";
 import Units from "./units";
+import User from "./user";
 
 class Qualifications
   extends Model<QualificationsInterface>

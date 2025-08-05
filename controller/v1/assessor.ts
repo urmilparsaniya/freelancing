@@ -75,6 +75,29 @@ class assessorController {
       res.handler.serverError(error);
     }
   }
+
+  static async deleteAssessor(req: Request, res: Response): Promise<void> {
+    try {
+      let assessorId = req.params.id as string | number
+      let userData = req.headers["user_info"] as userAuthenticationData;
+      let request = await AssessorService.deleteAssessor(
+        assessorId,
+        userData
+      );
+      if (request.status !== STATUS_CODES.SUCCESS) {
+        res.handler.errorResponse(request.status, request.message);
+        return;
+      }
+      res.handler.successResponse(
+        request.status,
+        request.data,
+        request.message
+      );
+    } catch (error) {
+      error = "server error";
+      res.handler.serverError(error);
+    }
+  }
 }
 
 export default assessorController;

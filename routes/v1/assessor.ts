@@ -15,4 +15,6 @@ router
 
 router.route("/list").get(authenticateUser, assessorController.listAssessor);
 
+router.route('/delete/:id').delete(authenticateUser, assessorController.deleteAssessor)
+
 export default router;

@@ -4,6 +4,7 @@ const { sequelize } = require("../../configs/database");
 import { UserInterface } from "../../interface/user";
 import BaseModel from "./base";
 import { TABLE_NAME } from "../../configs/tables";
+import Qualifications from "./qualifications";
 
 class User extends Model<UserInterface> implements UserInterface {
   public id!: number;
@@ -85,6 +86,14 @@ User.init(
   },
   { ...BaseModel.initBaseOptions(sequelize), tableName: TABLE_NAME.USER }
 );
+
+User.belongsToMany(Qualifications, {
+  through: 'tbl_user_qualification',
+  foreignKey: 'user_id',
+  otherKey: 'qualification_id',
+  as: 'qualifications',
+});
+
 
 User.findUserData = async (id) => 
   User.findOne({
