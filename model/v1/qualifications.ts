@@ -8,6 +8,7 @@ import SubOutcomes from "../../database/schema/sub_outcomes";
 import OutcomeSubpoints from "../../database/schema/outcome_subpoints";
 import { Op, Order, Sequelize } from "sequelize";
 import { paginate } from "../../helper/utils";
+import UserQualification from "../../database/schema/user_qualification";
 const { sequelize } = require("../../configs/database");
 
 class qualificationService {
@@ -288,6 +289,17 @@ class qualificationService {
         return {
           status: STATUS_CODES.BAD_REQUEST,
           message: "Invalid Qualification",
+        };
+      }
+      // Validate if qualification is used by any learner or assessor
+      let isUsed = await UserQualification.findOne({
+        where: { qualification_id: qualificationId },
+        attributes: ["id"],
+      });
+      if (isUsed) {
+        return {
+          status: STATUS_CODES.BAD_REQUEST,
+          message: "Qualification is used by a learner or assessor",
         };
       }
       let deleteQualification = await Qualifications.destroy({

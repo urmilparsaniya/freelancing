@@ -2,7 +2,8 @@ require("dotenv").config();
 import { userAuthenticationData, UserInterface } from "../../interface/user";
 import { Roles, STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
 import { Op, Order, Sequelize } from "sequelize";
-import { paginate } from "../../helper/utils";
+import { paginate, generateSecurePassword } from "../../helper/utils";
+import { emailService } from "../../helper/emailService";
 import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
 import UserQualification from "../../database/schema/user_qualification";
@@ -28,7 +29,7 @@ class AssessorService {
         };
       }
       data.role = Roles.ASSESSOR;
-      data.password = "Admin@123456";
+      data.password = await generateSecurePassword();
       let createUser = await User.create(data, { transaction });
       // Create Qualification of assessor
       // Parse qualifications (assuming it's a comma-separated string)
@@ -60,6 +61,14 @@ class AssessorService {
           qualification_id: qid,
         }))
       );
+      
+      // Send Email to Assessor
+      await emailService.sendAssessorAccountEmail(
+        createUser.name,
+        createUser.email,
+        data.password // Use the original password before hashing
+      );
+      
       await transaction.commit();
       return {
         data: createUser,

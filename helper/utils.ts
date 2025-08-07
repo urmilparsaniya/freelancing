@@ -194,6 +194,35 @@ export const generateOTP = async (): Promise<string> => {
   return otp;
 };
 
+// Generate Secure Password
+export const generateSecurePassword = async (): Promise<string> => {
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const numbers = '0123456789';
+  const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+  // Pick one character from each category
+  let passwordChars = [
+    lowercase[Math.floor(Math.random() * lowercase.length)],
+    uppercase[Math.floor(Math.random() * uppercase.length)],
+    numbers[Math.floor(Math.random() * numbers.length)],
+    symbols[Math.floor(Math.random() * symbols.length)],
+  ];
+
+  // Pool of all characters
+  const allChars = lowercase + uppercase + numbers + symbols;
+
+  // Fill remaining characters (total 8 - already have 4)
+  for (let i = 0; i < 4; i++) {
+    passwordChars.push(allChars[Math.floor(Math.random() * allChars.length)]);
+  }
+
+  // Shuffle array to avoid predictable order and return as string
+  return passwordChars
+    .sort(() => Math.random() - 0.5)
+    .join('');
+};
+
 // Cache Common function
 const cache_ = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 

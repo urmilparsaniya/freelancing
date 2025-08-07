@@ -2,7 +2,8 @@ require("dotenv").config();
 import { userAuthenticationData, UserInterface } from "../../interface/user";
 import { Roles, STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
 import { Op, Order, Sequelize } from "sequelize";
-import { paginate } from "../../helper/utils";
+import { paginate, generateSecurePassword } from "../../helper/utils";
+import { emailService } from "../../helper/emailService";
 import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
 import UserQualification from "../../database/schema/user_qualification";
@@ -28,7 +29,8 @@ class LearnerService {
         };
       }
       data.role = Roles.LEARNER;
-      data.password = "Admin@123456";
+      // Generate Secure Password
+      data.password = await generateSecurePassword();
       let createUser = await User.create(data, { transaction });
       // Create Qualification of Learner
       // Parse qualifications (assuming it's a comma-separated string)
@@ -59,6 +61,12 @@ class LearnerService {
           user_id: createUser.id,
           qualification_id: qid,
         }))
+      );
+      // Send Email to Learner
+      await emailService.sendLearnerAccountEmail(
+        createUser.name,
+        createUser.email,
+        data.password // Use the original password before hashing
       );
       await transaction.commit();
       return {
@@ -113,7 +121,6 @@ class LearnerService {
       });
 
       if (data.qualifications) {
-        console.log('work')
         const qualificationIds = data.qualifications
           .split(",")
           .map((id) => parseInt(id.trim()))
