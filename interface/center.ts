@@ -1,8 +1,8 @@
-export interface RoleInterface {
+export interface CenterInterface {
   id: number;
-  role: string;
+  center_name: string;
+  center_admin: number;
   status: number;
-  role_slug?: string;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;

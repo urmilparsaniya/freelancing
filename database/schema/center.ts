@@ -3,41 +3,46 @@ import { DataTypes } from "sequelize";
 const { sequelize } = require("../../configs/database");
 import BaseModel from "./base";
 import { TABLE_NAME } from "../../configs/tables";
-import { RoleInterface } from "../../interface/role";
+import { CenterInterface } from "../../interface/center";
 
-class Role extends Model<RoleInterface> implements RoleInterface {
+class Center extends Model<CenterInterface> implements CenterInterface {
   public id!: number;
-  public role!: string;
-  public role_slug!: string;
+  public center_name!: string;
+  public center_admin!: number;
   public status!: number;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
   public deletedAt?: Date;
+  static findById: (id: number) => Promise<CenterInterface | null>;
 }
 
-Role.init(
+Center.init(
   {
     ...BaseModel.initBaseModel(sequelize),
-    status: {
-      type: DataTypes.INTEGER,
-      comment: "1: Active, 2: Inactive",
-      defaultValue: 1,
-    },
-    role: {
+    center_name: {
       type: DataTypes.STRING,
       allowNull: true,
-      unique: true,
     },
-    role_slug: {
-      type: DataTypes.STRING,
+    status: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+    },
+    center_admin: {
+      type: DataTypes.INTEGER,
       allowNull: true,
     },
   },
   {
     ...BaseModel.initBaseOptions(sequelize),
-    tableName: TABLE_NAME.ROLE,
+    tableName: TABLE_NAME.CENTER,
   }
 );
 
-export default Role
+Center.findById = async (id) => 
+  Center.findOne({
+    where: { id, deletedAt: null }
+  });
+
+export default Center;

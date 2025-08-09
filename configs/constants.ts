@@ -166,5 +166,8 @@ export const Roles = {
   SUPER_ADMIN: 1,
   ASSESSOR: 2,
   LEARNER: 3,
-  OBSERVER: 4
+  OBSERVER: 4,
+  IQA: 5,
+  EQA: 6,
+  ADMIN: 7,
 }

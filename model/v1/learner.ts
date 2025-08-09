@@ -29,6 +29,7 @@ class LearnerService {
         };
       }
       data.role = Roles.LEARNER;
+      data.center_id = userData.center_id;
       // Generate Secure Password
       data.password = await generateSecurePassword();
       let createUser = await User.create(data, { transaction });
@@ -116,6 +117,8 @@ class LearnerService {
           message: "Email already used",
         };
       }
+      data.center_id = userData.center_id;
+      // Update user data
       await User.update(data, {
         where: { id: learnerId },
       });

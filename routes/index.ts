@@ -6,6 +6,9 @@ import userRoute from "./v1/user";
 import qualificationRoute from "./v1/qualifications";
 import assessor from "./v1/assessor"
 import learner from "./v1/learner"
+import IQA from "./v1/iqa";
+import EQA from "./v1/eqa";
+import Admin from "./v1/admin";
 
 dotenv.config();
 
@@ -52,4 +55,25 @@ export default (app: Application): void => {
     upload.single("file"),
     learner
   )
+
+  // IQA Routes
+  app.use(
+    "/" + process.env.API_BASE_URL + "/v1/iqa",
+    upload.single("file"),
+    IQA
+  );
+
+  // EQA Routes
+  app.use(
+    "/" + process.env.API_BASE_URL + "/v1/eqa",
+    upload.single("file"),
+    EQA
+  );
+
+  // Admin Routes
+  app.use(
+    "/" + process.env.API_BASE_URL + "/v1/admin",
+    upload.single("file"),
+    Admin
+  );
 };

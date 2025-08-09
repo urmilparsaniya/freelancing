@@ -6,5 +6,6 @@ export const TABLE_NAME = {
   OUTCOMES: "tbl_sub_outcomes",
   OUTCOME_SUBPOINTS: "tbl_outcome_subpoints",
   USER_QUALIFICATION: "tbl_user_qualification",
-  ROLE: "tbl_role"
+  ROLE: "tbl_role",
+  CENTER: "tbl_center",
 };

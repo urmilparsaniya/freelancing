@@ -31,6 +31,8 @@ export interface UserInterface {
   start_date?: string;
   expected_end_date?: string;
   employer?: string;
+  center_id?: number; 
+  center_name?: string; // Added center_name field
 }
 
 export interface userAuthenticationData {
@@ -42,4 +44,5 @@ export interface userAuthenticationData {
   phone_number?: string;
   phone_code?: string;
   data?: string;
+  center_id?: number;
 }

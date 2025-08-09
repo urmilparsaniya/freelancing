@@ -7,11 +7,12 @@ import { emailService } from "../../helper/emailService";
 import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
 import UserQualification from "../../database/schema/user_qualification";
+import Center from "../../database/schema/center";
 const { sequelize } = require("../../configs/database");
 
-class AssessorService {
-  // Create Assessor
-  static async createAssessor(
+class AdminService {
+  // Create Admin
+  static async createAdmin(
     data: UserInterface,
     userData: userAuthenticationData
   ): Promise<any> {
@@ -28,87 +29,78 @@ class AssessorService {
           message: "Email already used",
         };
       }
-      data.role = Roles.ASSESSOR;
-      data.center_id = userData.center_id;
+      data.role = Roles.ADMIN;
+      // Generate Secure Password
       data.password = await generateSecurePassword();
       let createUser = await User.create(data, { transaction });
-      // Create Qualification of assessor
-      // Parse qualifications (assuming it's a comma-separated string)
-      if (!data.qualifications) {
+      // Create Center of Admin
+      if (!data.center_name) {
         return {
           status: STATUS_CODES.BAD_REQUEST,
-          message: "Qualification Required",
+          message: "Center name is required",
         };
       }
-      const qualificationIds = data.qualifications
-        .split(",")
-        .map((id) => parseInt(id.trim()))
-        .filter(Boolean);
-
-      // Validate qualifications exist
-      const validQualifications = await Qualifications.findAll({
-        where: { id: qualificationIds },
+      // Check if center already exists
+      let existingCenter = await Center.findOne({
+        where: { center_name: data.center_name, deletedAt: null },
       });
-
-      if (validQualifications.length !== qualificationIds.length) {
+      if (existingCenter) {
         return {
           status: STATUS_CODES.BAD_REQUEST,
-          message: "Some qualifications are invalid",
+          message: "Center already exists",
         };
       }
-      await UserQualification.bulkCreate(
-        qualificationIds.map((qid) => ({
-          user_id: createUser.id,
-          qualification_id: qid,
-        }))
+      let centerData = await Center.create(
+        {
+          center_name: data.center_name,
+          center_admin: createUser.id,
+        },
+        { transaction }
       );
-      
-      // Send Email to Assessor
-      await emailService.sendAssessorAccountEmail(
-        createUser.name,
-        createUser.email,
-        data.password // Use the original password before hashing
+      // update center_id in user
+      await User.update(
+        { center_id: centerData.id },
+        { where: { id: createUser.id }, transaction }
       );
-      
       await transaction.commit();
       return {
-        data: createUser,
-        message: "Assessor Created Successfully",
         status: STATUS_CODES.SUCCESS,
+        data: createUser,
+        message: "Admin created successfully",
       };
     } catch (error) {
       await transaction.rollback();
-      console.log(error);
       return {
         status: STATUS_CODES.SERVER_ERROR,
-        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+        message: "Server error",
       };
     }
   }
 
-  // Update Assessor
-  static async updateAssessor(
+  // Update Admin
+  static async updateAdmin(
+    adminId: string | number,
     data: UserInterface,
-    userId: string | number,
     userData: userAuthenticationData
-  ) {
+  ): Promise<any> {
     const transaction = await sequelize.transaction();
     try {
-      // Check is valid user
-      let isValidUser = await User.findOne({
-        where: { id: userId, deletedAt: null },
-      });
-      if (!isValidUser) {
+      let admin = await User.findByPk(adminId, { transaction });
+      if (!admin || admin.role !== Roles.ADMIN) {
         return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "User not found",
+          status: STATUS_CODES.NOT_FOUND,
+          message: "Admin not found",
         };
       }
-      // check if email already used
+      let adminCenter = await Center.findOne({
+        where: { center_admin: adminId, deletedAt: null },
+        attributes: ["id", "center_name"],
+      });
+      // Check if email already used
       let isEmailUsed = await User.findOne({
         where: {
           email: data.email,
-          id: { [Op.ne]: userId },
+          id: { [Op.ne]: adminId },
           deletedAt: null,
         },
       });
@@ -118,60 +110,59 @@ class AssessorService {
           message: "Email already used",
         };
       }
-      data.center_id = userData.center_id;
       await User.update(data, {
-        where: { id: userId },
+        where: { id: adminId },
+        transaction,
       });
-
-      if (data.qualifications) {
-        const qualificationIds = data.qualifications
-          .split(",")
-          .map((id) => parseInt(id.trim()))
-          .filter(Boolean);
-
-        // Validate qualification IDs
-        const validQualifications = await Qualifications.findAll({
-          where: { id: qualificationIds },
+      if (data.center_name) {
+        // Check if center already exists
+        let currentCenter = await Center.findOne({
+          where: { center_name: adminCenter.center_name, deletedAt: null },
+          attributes: ["id", "center_name"],
         });
-
-        if (validQualifications.length !== qualificationIds.length) {
-          return {
-            status: STATUS_CODES.BAD_REQUEST,
-            message: "Some qualifications are invalid",
-          };
+        if (currentCenter && currentCenter.center_name !== data.center_name) {
+          const existingCenter = await Center.findOne({
+            where: {
+              center_name: data.center_name,
+              deletedAt: null,
+              id: { [Op.ne]: currentCenter.id },
+            },
+            transaction,
+          });
+          if (existingCenter) {
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.BAD_REQUEST,
+              message: "Center already exists",
+            };
+          }
+          await Center.update(
+            { center_name: data.center_name },
+            { where: { id: currentCenter.id }, transaction }
+          );
         }
-
-        // Remove old qualifications
-        await UserQualification.destroy({
-          where: { user_id: userId },
-          force: true
-        });
-
-        // Insert updated qualifications
-        await UserQualification.bulkCreate(
-          qualificationIds.map((qid) => ({
-            user_id: +userId,
-            qualification_id: qid,
-          }))
-        );
       }
-      await transaction.commit()
+      await transaction.commit();
       return {
-        data: {},
         status: STATUS_CODES.SUCCESS,
-        message: "Assessor Updated Successfully",
+        data: admin,
+        message: "Admin updated successfully",
       };
     } catch (error) {
-      await transaction.rollback()
+      console.log("Error:", error);
+      await transaction.rollback();
       return {
         status: STATUS_CODES.SERVER_ERROR,
-        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+        message: "Server error",
       };
     }
   }
 
-  // List Assessor
-  static async listAssessor(data, userData: userAuthenticationData) {
+  // List Admins
+  static async listAdmins(
+    data: any,
+    userData: userAuthenticationData
+  ): Promise<any> {
     try {
       const limit = data?.limit ? +data.limit : 0;
       const page = data?.page ? +data.page : 0;
@@ -181,13 +172,18 @@ class AssessorService {
       let order: Order = [[sort_by, sort_order]];
       const fetchAll = limit === 0 || page === 0;
       let userData_ = await User.findAndCountAll({
-        where: { deletedAt: null, role: Roles.ASSESSOR },
+        where: { deletedAt: null, role: Roles.ADMIN },
         include: [
           {
             model: Qualifications,
             as: "qualifications",
             through: { attributes: [] }, // prevent including join table info
           },
+          {
+            model: Center,
+            as: "center",
+            attributes: ["id", "center_name"],
+          }
         ],
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
@@ -203,54 +199,56 @@ class AssessorService {
       return {
         status: STATUS_CODES.SUCCESS,
         data: response,
-        message: "Assessor List fetched successfully",
+        message: "Admin List fetched successfully",
       };
     } catch (error) {
-      console.log(error);
       return {
         status: STATUS_CODES.SERVER_ERROR,
-        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+        message: "Server error",
       };
     }
   }
 
-  // Delete Assessor
-  static async deleteAssessor(
-    assessorId: number | string,
+  // Delete Admin
+  static async deleteAdmin(
+    adminId: string | number,
     userData: userAuthenticationData
-  ) {
+  ): Promise<any> {
     try {
-      let assessorData = await User.findOne({
-        where: { id: assessorId, deletedAt: null, role: Roles.ASSESSOR },
+      let adminData = await User.findOne({
+        where: { id: adminId, deletedAt: null, role: Roles.ADMIN },
         attributes: ["id"],
       });
-      if (!assessorData) {
+      if (!adminData) {
         return {
           status: STATUS_CODES.BAD_REQUEST,
-          message: "Assessor not found",
+          message: "Admin not found",
         };
       }
-      let deleteAssessor = await User.destroy({
-        where: { id: assessorId },
+      let deleteAdmin = await User.destroy({
+        where: { id: adminId },
         force: true
       });
       let deleteUserQualification = await UserQualification.destroy({
-        where: { user_id: assessorId },
+        where: { user_id: adminId },
+        force: true
+      });
+      let deleteCenter = await Center.destroy({
+        where: { center_admin: adminId },
         force: true
       });
       return {
         status: STATUS_CODES.SUCCESS,
         data: {},
-        message: "Assessor deleted successfully",
+        message: "Admin deleted successfully",
       };
     } catch (error) {
-      console.log(error);
       return {
         status: STATUS_CODES.SERVER_ERROR,
-        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+        message: "Server error",
       };
     }
   }
 }
 
-export default AssessorService;
+export default AdminService;

@@ -2,16 +2,16 @@ require("dotenv").config();
 import { userAuthenticationData, UserInterface } from "../../interface/user";
 import { Roles, STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
 import { Op, Order, Sequelize } from "sequelize";
-import { paginate, generateSecurePassword } from "../../helper/utils";
-import { emailService } from "../../helper/emailService";
+import { generateSecurePassword, paginate } from "../../helper/utils";
 import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
 import UserQualification from "../../database/schema/user_qualification";
+import { emailService } from "../../helper/emailService";
 const { sequelize } = require("../../configs/database");
 
-class AssessorService {
-  // Create Assessor
-  static async createAssessor(
+class EQAService {
+  // Create EQA
+  static async createEQA(
     data: UserInterface,
     userData: userAuthenticationData
   ): Promise<any> {
@@ -28,53 +28,115 @@ class AssessorService {
           message: "Email already used",
         };
       }
-      data.role = Roles.ASSESSOR;
+      data.role = Roles.EQA;
       data.center_id = userData.center_id;
+      // Generate Secure Password
       data.password = await generateSecurePassword();
       let createUser = await User.create(data, { transaction });
-      // Create Qualification of assessor
-      // Parse qualifications (assuming it's a comma-separated string)
-      if (!data.qualifications) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Qualification Required",
-        };
-      }
-      const qualificationIds = data.qualifications
-        .split(",")
-        .map((id) => parseInt(id.trim()))
-        .filter(Boolean);
+      // Create Qualification of Learner
+      if (data.qualifications) {
+        const qualificationIds = data.qualifications
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
 
-      // Validate qualifications exist
-      const validQualifications = await Qualifications.findAll({
-        where: { id: qualificationIds },
-      });
+        // Validate qualifications exist
+        const validQualifications = await Qualifications.findAll({
+          where: { id: qualificationIds },
+        });
 
-      if (validQualifications.length !== qualificationIds.length) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Some qualifications are invalid",
-        };
+        if (validQualifications.length !== qualificationIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some qualifications are invalid",
+          };
+        }
+        await UserQualification.bulkCreate(
+          qualificationIds.map((qid) => ({
+            userId: createUser.id,
+            qualificationId: qid,
+          })),
+          { transaction }
+        );
       }
-      await UserQualification.bulkCreate(
-        qualificationIds.map((qid) => ({
-          user_id: createUser.id,
-          qualification_id: qid,
-        }))
-      );
-      
-      // Send Email to Assessor
-      await emailService.sendAssessorAccountEmail(
+      // Send Email to Learner
+      await emailService.sendLearnerAccountEmail(
         createUser.name,
         createUser.email,
         data.password // Use the original password before hashing
       );
-      
       await transaction.commit();
       return {
-        data: createUser,
-        message: "Assessor Created Successfully",
         status: STATUS_CODES.SUCCESS,
+        data: createUser,
+        message: "EQA created successfully",
+      };
+    } catch (error) {
+      await transaction.rollback();
+      console.log(error);
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+      };
+    }
+  }
+  // Update EQA
+  static async updateEQA(
+    id: string | number,
+    data: UserInterface,
+    userData: userAuthenticationData
+  ) {
+    const transaction = await sequelize.transaction();
+    try {
+      // Check if EQA exists
+      let isEQA = await User.findOne({
+        where: { id, role: Roles.EQA, deletedAt: null },
+        attributes: ["id"],
+      });
+      if (!isEQA) {
+        return {
+          status: STATUS_CODES.NOT_FOUND,
+          message: "EQA not found",
+        };
+      }
+      data.center_id = userData.center_id;
+      // Update EQA data
+      await User.update(data, { where: { id }, transaction });
+      if (data.qualifications) {
+        const qualificationIds = data.qualifications
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+
+        // Validate qualifications exist
+        const validQualifications = await Qualifications.findAll({
+          where: { id: qualificationIds },
+        });
+
+        if (validQualifications.length !== qualificationIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some qualifications are invalid",
+          };
+        }
+        // Update User Qualifications
+        await UserQualification.destroy({
+          where: { user_id: id },
+          transaction,
+        });
+        await UserQualification.bulkCreate(
+          qualificationIds.map((qid) => ({
+            userId: isEQA.id,
+            qualificationId: qid,
+          })),
+          { transaction }
+        );
+      }
+      await transaction.commit();
+      return {
+        status: STATUS_CODES.SUCCESS,
+        data: null,
+        message: "EQA updated successfully",
       };
     } catch (error) {
       await transaction.rollback();
@@ -86,92 +148,8 @@ class AssessorService {
     }
   }
 
-  // Update Assessor
-  static async updateAssessor(
-    data: UserInterface,
-    userId: string | number,
-    userData: userAuthenticationData
-  ) {
-    const transaction = await sequelize.transaction();
-    try {
-      // Check is valid user
-      let isValidUser = await User.findOne({
-        where: { id: userId, deletedAt: null },
-      });
-      if (!isValidUser) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "User not found",
-        };
-      }
-      // check if email already used
-      let isEmailUsed = await User.findOne({
-        where: {
-          email: data.email,
-          id: { [Op.ne]: userId },
-          deletedAt: null,
-        },
-      });
-      if (isEmailUsed) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Email already used",
-        };
-      }
-      data.center_id = userData.center_id;
-      await User.update(data, {
-        where: { id: userId },
-      });
-
-      if (data.qualifications) {
-        const qualificationIds = data.qualifications
-          .split(",")
-          .map((id) => parseInt(id.trim()))
-          .filter(Boolean);
-
-        // Validate qualification IDs
-        const validQualifications = await Qualifications.findAll({
-          where: { id: qualificationIds },
-        });
-
-        if (validQualifications.length !== qualificationIds.length) {
-          return {
-            status: STATUS_CODES.BAD_REQUEST,
-            message: "Some qualifications are invalid",
-          };
-        }
-
-        // Remove old qualifications
-        await UserQualification.destroy({
-          where: { user_id: userId },
-          force: true
-        });
-
-        // Insert updated qualifications
-        await UserQualification.bulkCreate(
-          qualificationIds.map((qid) => ({
-            user_id: +userId,
-            qualification_id: qid,
-          }))
-        );
-      }
-      await transaction.commit()
-      return {
-        data: {},
-        status: STATUS_CODES.SUCCESS,
-        message: "Assessor Updated Successfully",
-      };
-    } catch (error) {
-      await transaction.rollback()
-      return {
-        status: STATUS_CODES.SERVER_ERROR,
-        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
-      };
-    }
-  }
-
-  // List Assessor
-  static async listAssessor(data, userData: userAuthenticationData) {
+  // List EQA
+  static async listEQA(data: any, userData: userAuthenticationData) {
     try {
       const limit = data?.limit ? +data.limit : 0;
       const page = data?.page ? +data.page : 0;
@@ -181,7 +159,7 @@ class AssessorService {
       let order: Order = [[sort_by, sort_order]];
       const fetchAll = limit === 0 || page === 0;
       let userData_ = await User.findAndCountAll({
-        where: { deletedAt: null, role: Roles.ASSESSOR },
+        where: { deletedAt: null, role: Roles.EQA },
         include: [
           {
             model: Qualifications,
@@ -203,7 +181,7 @@ class AssessorService {
       return {
         status: STATUS_CODES.SUCCESS,
         data: response,
-        message: "Assessor List fetched successfully",
+        message: "Learner List fetched successfully",
       };
     } catch (error) {
       console.log(error);
@@ -214,36 +192,40 @@ class AssessorService {
     }
   }
 
-  // Delete Assessor
-  static async deleteAssessor(
-    assessorId: number | string,
+  // Delete EQA
+  static async deleteEQA(
+    id: string | number,
     userData: userAuthenticationData
   ) {
+    const transaction = await sequelize.transaction();
     try {
-      let assessorData = await User.findOne({
-        where: { id: assessorId, deletedAt: null, role: Roles.ASSESSOR },
+      // Check if EQA exists
+      let isEQA = await User.findOne({
+        where: { id, role: Roles.EQA, deletedAt: null },
         attributes: ["id"],
       });
-      if (!assessorData) {
+      if (!isEQA) {
         return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Assessor not found",
+          status: STATUS_CODES.NOT_FOUND,
+          message: "EQA not found",
         };
       }
-      let deleteAssessor = await User.destroy({
-        where: { id: assessorId },
-        force: true
+      let deleteLearner = await User.destroy({
+        where: { id },
+        force: true,
       });
       let deleteUserQualification = await UserQualification.destroy({
-        where: { user_id: assessorId },
-        force: true
+        where: { user_id: id },
+        force: true,
       });
+      await transaction.commit();
       return {
         status: STATUS_CODES.SUCCESS,
-        data: {},
-        message: "Assessor deleted successfully",
+        data: null,
+        message: "EQA deleted successfully",
       };
     } catch (error) {
+      await transaction.rollback();
       console.log(error);
       return {
         status: STATUS_CODES.SERVER_ERROR,
@@ -253,4 +235,4 @@ class AssessorService {
   }
 }
 
-export default AssessorService;
+export default EQAService;
