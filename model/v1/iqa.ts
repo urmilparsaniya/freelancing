@@ -53,8 +53,8 @@ class IQAService {
         }
         await UserQualification.bulkCreate(
           qualificationIds.map((qid) => ({
-            userId: createUser.id,
-            qualificationId: qid,
+            user_id: createUser.id,
+            qualification_id: qid,
           })),
           { transaction }
         );
@@ -126,8 +126,8 @@ class IQAService {
         });
         await UserQualification.bulkCreate(
           qualificationIds.map((qid) => ({
-            userId: isIQA.id,
-            qualificationId: qid,
+            user_id: isIQA.id,
+            qualification_id: qid,
           })),
           { transaction }
         );
