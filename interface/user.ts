@@ -32,6 +32,7 @@ export interface UserInterface {
   expected_end_date?: string;
   employer?: string;
   center_id?: number; 
+  employer_address?: string;
   center_name?: string; // Added center_name field
 }
 

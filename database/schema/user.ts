@@ -6,6 +6,7 @@ import BaseModel from "./base";
 import { TABLE_NAME } from "../../configs/tables";
 import Qualifications from "./qualifications";
 import Center from "./center";
+import Role from "./role";
 
 class User extends Model<UserInterface> implements UserInterface {
   public id!: number;
@@ -28,6 +29,7 @@ class User extends Model<UserInterface> implements UserInterface {
   public start_date!: string;
   public expected_end_date!: string;
   public employer!: string;
+  public employer_address!: string;
   public center_id?: number; // Optional field for center association
   public theme_color!: string; // Added theme_color field
   // timestamps!
@@ -137,6 +139,10 @@ User.init(
       type: DataTypes.INTEGER,
       allowNull: true, // Optional field for center association
     },
+    employer_address: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   },
   { ...BaseModel.initBaseOptions(sequelize), tableName: TABLE_NAME.USER }
 );
@@ -151,6 +157,11 @@ User.belongsToMany(Qualifications, {
 User.belongsTo(Center, {
   foreignKey: "center_id",
   as: "center",
+});
+
+User.belongsTo(Role, {
+  foreignKey: "role",
+  as: "role_data",
 });
 
 User.findUserData = async (id) =>

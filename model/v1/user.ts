@@ -2,8 +2,15 @@ require("dotenv").config();
 import { STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
 import { compare } from "bcrypt";
 import jwt from "jsonwebtoken";
-import { AuthResponse, userAuthenticationData, UserInterface } from "../../interface/user";
+import {
+  AuthResponse,
+  userAuthenticationData,
+  UserInterface,
+} from "../../interface/user";
 import User from "../../database/schema/user";
+import Qualifications from "../../database/schema/qualifications";
+import Center from "../../database/schema/center";
+import Role from "../../database/schema/role";
 const jwtSecret = process.env.JWT_SECRET || "";
 const AccessTokenExpiration = process.env.ACCESS_TOKEN_EXPIRATION || "";
 
@@ -49,7 +56,9 @@ class userAuthService {
   }
 
   // Get user authentication data
-  static async getUserAuthData(loginToken: string): Promise<UserInterface | null> {
+  static async getUserAuthData(
+    loginToken: string
+  ): Promise<UserInterface | null> {
     if (!loginToken) {
       return null;
     }
@@ -58,12 +67,30 @@ class userAuthService {
         login_token: loginToken,
         deletedAt: null,
       },
+      include: [
+        {
+          model: Qualifications,
+          as: "qualifications",
+          through: { attributes: [] }, // prevent including join table info
+        },
+        {
+          model: Center,
+          as: "center",
+        },
+        {
+          model: Role,
+          as: "role_data",
+        }
+      ],
     });
     return adminData || null;
   }
 
   // Update user profile
-  static async updateUserProfile(data: UserInterface, userData: userAuthenticationData): Promise<AuthResponse> {
+  static async updateUserProfile(
+    data: UserInterface,
+    userData: userAuthenticationData
+  ): Promise<AuthResponse> {
     // check if valid user
     let isUser = await User.findOne({
       where: {
@@ -84,7 +111,7 @@ class userAuthService {
       data: userData_,
       status: STATUS_CODES.SUCCESS,
       message: STATUS_MESSAGE.USER.USER_UPDATED,
-    }
+    };
   }
 }
 
