@@ -154,6 +154,13 @@ User.belongsToMany(Qualifications, {
   as: "qualifications",
 });
 
+User.belongsToMany(User, {
+  through: "tbl_user_learner",
+  foreignKey: "user_id",
+  otherKey: "learner_id",
+  as: "learners",
+});
+
 User.belongsTo(Center, {
   foreignKey: "center_id",
   as: "center",

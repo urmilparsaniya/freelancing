@@ -8,4 +8,5 @@ export const TABLE_NAME = {
   USER_QUALIFICATION: "tbl_user_qualification",
   ROLE: "tbl_role",
   CENTER: "tbl_center",
+  USER_LEARNER: "tbl_user_learner",
 };

@@ -7,6 +7,7 @@ import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
 import UserQualification from "../../database/schema/user_qualification";
 import { emailService } from "../../helper/emailService";
+import UserLearner from "../../database/schema/user_learner";
 const { sequelize } = require("../../configs/database");
 
 class EQAService {
@@ -53,8 +54,32 @@ class EQAService {
         }
         await UserQualification.bulkCreate(
           qualificationIds.map((qid) => ({
-            userId: createUser.id,
-            qualificationId: qid,
+            user_id: createUser.id,
+            qualification_id: qid,
+          })),
+          { transaction }
+        );
+      }
+      // Create User Learner
+      if (data.learners) {
+        const learnerIds = data.learners
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        // Validate learners exist
+        const validLearners = await User.findAll({
+          where: { id: learnerIds, role: Roles.LEARNER, deletedAt: null },
+        });
+        if (validLearners.length !== learnerIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some learners are invalid",
+          };
+        }
+        await UserLearner.bulkCreate(
+          learnerIds.map((lid) => ({
+            user_id: createUser.id,
+            learner_id: lid,
           })),
           { transaction }
         );
@@ -126,8 +151,35 @@ class EQAService {
         });
         await UserQualification.bulkCreate(
           qualificationIds.map((qid) => ({
-            userId: isEQA.id,
-            qualificationId: qid,
+            user_id: isEQA.id,
+            qualification_id: qid,
+          })),
+          { transaction }
+        );
+      }
+      if (data.learners) {
+        const learnerIds = data.learners
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        // Validate learners exist
+        const validLearners = await User.findAll({
+          where: { id: learnerIds, role: Roles.LEARNER, deletedAt: null },
+        });
+        if (validLearners.length !== learnerIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some learners are invalid",
+          };
+        }
+        await UserLearner.destroy({
+          where: { user_id: id },
+          transaction,
+        });
+        await UserLearner.bulkCreate(
+          learnerIds.map((lid) => ({
+            user_id: isEQA.id,
+            learner_id: lid,
           })),
           { transaction }
         );
@@ -165,6 +217,12 @@ class EQAService {
             model: Qualifications,
             as: "qualifications",
             through: { attributes: [] }, // prevent including join table info
+          },
+          {
+            model: User,
+            as: "learners",
+            through: { attributes: [] }, // prevent including join table info
+            where: { deletedAt: null, role: Roles.LEARNER },
           },
         ],
         limit: fetchAll ? undefined : limit,

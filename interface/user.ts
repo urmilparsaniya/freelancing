@@ -34,6 +34,7 @@ export interface UserInterface {
   center_id?: number; 
   employer_address?: string;
   center_name?: string; // Added center_name field
+  learners?: string;
 }
 
 export interface userAuthenticationData {
