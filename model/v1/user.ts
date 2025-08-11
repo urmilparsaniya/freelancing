@@ -47,9 +47,9 @@ class userAuthService {
       { login_token: loginToken },
       { where: { id: isUser.id } }
     );
-    isUser.login_token = loginToken;
+    const userData = await User.findUserData(isUser.id);
     return {
-      data: isUser,
+      data: userData,
       status: STATUS_CODES.SUCCESS,
       message: STATUS_MESSAGE.USER.USER_LOGIN,
     };

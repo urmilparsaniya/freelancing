@@ -170,6 +170,22 @@ User.findUserData = async (id) =>
       id,
       deletedAt: null,
     },
+    include: [
+      {
+        model: Qualifications,
+        as: "qualifications",
+        through: { attributes: [] }, // prevent including join table info
+      },
+      {
+        model: Center,
+        as: "center",
+        attributes: ["id", "center_name"],
+      },
+      {
+        model: Role,
+        as: "role_data",
+      }
+    ],
   });
 
 export default User;
