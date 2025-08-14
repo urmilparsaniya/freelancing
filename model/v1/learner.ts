@@ -198,12 +198,29 @@ class LearnerService {
         center_data = await Center.findById(center_id);
       }
 
+      // Qualification Ids where condition
+      let whereConditionQualification: any = {
+        deletedAt: null,
+      };
+      if (data.qualification_id) {
+        // Convert comma-separated IDs into an array of numbers
+        const qualificationIds = data.qualification_id
+          .split(",")
+          .map((id) => Number(id.trim()))
+          .filter((id) => !isNaN(id));
+
+        if (qualificationIds.length > 0) {
+          whereConditionQualification.id = { [Op.in]: qualificationIds };
+        }
+      }
+
       let userData_ = await User.findAndCountAll({
         where: whereCondition,
         include: [
           {
             model: Qualifications,
             as: "qualifications",
+            where: whereConditionQualification,
             through: { attributes: [] }, // prevent including join table info
           },
         ],

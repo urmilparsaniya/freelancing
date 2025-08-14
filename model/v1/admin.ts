@@ -259,7 +259,7 @@ class AdminService {
           {
             model: Center,
             as: "center",
-            attributes: ["id", "center_name"],
+            attributes: ["id", "center_name", "center_address"],
           },
         ],
         limit: fetchAll ? undefined : limit,
