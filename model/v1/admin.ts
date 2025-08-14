@@ -176,6 +176,10 @@ class AdminService {
             { where: { id: currentCenter.id }, transaction }
           );
         }
+        await Center.update(
+          { center_address: data.center_address },
+          { where: { id: currentCenter.id }, transaction }
+        )
       }
       if (data.qualifications) {
         const qualificationIds = data.qualifications
