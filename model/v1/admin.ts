@@ -57,6 +57,7 @@ class AdminService {
         {
           center_name: data.center_name,
           center_admin: createUser.id,
+          center_address: data.center_address
         },
         { transaction }
       );
@@ -171,7 +172,7 @@ class AdminService {
             };
           }
           await Center.update(
-            { center_name: data.center_name },
+            { center_name: data.center_name, center_address: data.center_address },
             { where: { id: currentCenter.id }, transaction }
           );
         }
