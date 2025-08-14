@@ -32,6 +32,11 @@ class User extends Model<UserInterface> implements UserInterface {
   public employer_address!: string;
   public center_id?: number; // Optional field for center association
   public theme_color!: string; // Added theme_color field
+  public access_start_date!: string;
+  public access_end_date!: string;
+  public awarding_name!: string;
+  public ethnicity!: string;
+  public additional_learning_needs!: number; // 1: Yes | 2: No | 3: Prefer not to say
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -143,6 +148,27 @@ User.init(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    access_start_date: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    access_end_date: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    awarding_name: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    ethnicity: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    additional_learning_needs: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 3, // 1: Yes | 2: No | 3: Prefer not to say
+    }
   },
   { ...BaseModel.initBaseOptions(sequelize), tableName: TABLE_NAME.USER }
 );

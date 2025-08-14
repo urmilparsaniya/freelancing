@@ -35,6 +35,11 @@ export interface UserInterface {
   employer_address?: string;
   center_name?: string; // Added center_name field
   learners?: string;
+  access_start_date?: string;
+  access_end_date?: string;
+  awarding_name?: string;
+  ethnicity?: string;
+  additional_learning_needs?: number; // 1: Yes | 2: No | 3: Prefer not to say
 }
 
 export interface userAuthenticationData {

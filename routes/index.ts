@@ -9,6 +9,7 @@ import learner from "./v1/learner"
 import IQA from "./v1/iqa";
 import EQA from "./v1/eqa";
 import Admin from "./v1/admin";
+import masterRoute from "./v1/master";
 
 dotenv.config();
 
@@ -75,5 +76,11 @@ export default (app: Application): void => {
     "/" + process.env.API_BASE_URL + "/v1/admin",
     upload.single("file"),
     Admin
+  );
+
+  // Master Routes
+  app.use(
+    "/" + process.env.API_BASE_URL + "/v1/master",
+    masterRoute
   );
 };

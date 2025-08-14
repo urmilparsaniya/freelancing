@@ -7,6 +7,9 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import NodeCache from "node-cache";
+import { userAuthenticationData } from "../interface/user";
+import { Sequelize } from "sequelize";
+import Center from "../database/schema/center";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION_NAME,
@@ -241,3 +244,17 @@ export const cache = {
     });
   },
 };
+
+export const centerId = async (userData: userAuthenticationData): Promise<number | null> => {
+  if (userData && userData.center_id) {
+    return userData.center_id;
+  } else {
+    // Find a random center if no center_id is provided
+    const randomCenter = await Center.findOne({
+      where: { status: 1, deletedAt: null },
+      attributes: ["id"],
+      order: Sequelize.literal("RAND()"),
+    });
+    return randomCenter ? randomCenter.id : null;
+  }
+}

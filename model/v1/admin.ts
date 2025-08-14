@@ -1,8 +1,8 @@
 require("dotenv").config();
 import { userAuthenticationData, UserInterface } from "../../interface/user";
 import { Roles, STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
-import { Op, Order, Sequelize } from "sequelize";
-import { paginate, generateSecurePassword } from "../../helper/utils";
+import { col, fn, Op, Order, Sequelize, where } from "sequelize";
+import { paginate, generateSecurePassword, centerId } from "../../helper/utils";
 import { emailService } from "../../helper/emailService";
 import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
@@ -42,7 +42,10 @@ class AdminService {
       }
       // Check if center already exists
       let existingCenter = await Center.findOne({
-        where: { center_name: data.center_name, deletedAt: null },
+        where: Sequelize.where(
+          Sequelize.fn("LOWER", Sequelize.col("center_name")),
+          data.center_name.trim().toLowerCase()
+        ),
       });
       if (existingCenter) {
         return {
@@ -62,6 +65,32 @@ class AdminService {
         { center_id: centerData.id },
         { where: { id: createUser.id }, transaction }
       );
+      // Create Qualification of Admin
+      if (data.qualifications) {
+        const qualificationIds = data.qualifications
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+
+        // Validate qualifications exist
+        const validQualifications = await Qualifications.findAll({
+          where: { id: qualificationIds },
+        });
+
+        if (validQualifications.length !== qualificationIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some qualifications are invalid",
+          };
+        }
+        await UserQualification.bulkCreate(
+          qualificationIds.map((qid) => ({
+            user_id: createUser.id,
+            qualification_id: qid,
+          })),
+          { transaction }
+        );
+      }
       await transaction.commit();
       return {
         status: STATUS_CODES.SUCCESS,
@@ -123,9 +152,14 @@ class AdminService {
         if (currentCenter && currentCenter.center_name !== data.center_name) {
           const existingCenter = await Center.findOne({
             where: {
-              center_name: data.center_name,
-              deletedAt: null,
-              id: { [Op.ne]: currentCenter.id },
+              [Op.and]: [
+                where(
+                  fn("LOWER", col("center_name")),
+                  data.center_name.trim().toLowerCase()
+                ),
+                { deletedAt: null },
+                { id: { [Op.ne]: currentCenter.id } },
+              ],
             },
             transaction,
           });
@@ -141,6 +175,36 @@ class AdminService {
             { where: { id: currentCenter.id }, transaction }
           );
         }
+      }
+      if (data.qualifications) {
+        const qualificationIds = data.qualifications
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+
+        // Validate qualifications exist
+        const validQualifications = await Qualifications.findAll({
+          where: { id: qualificationIds },
+        });
+
+        if (validQualifications.length !== qualificationIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some qualifications are invalid",
+          };
+        }
+        // Update User Qualifications
+        await UserQualification.destroy({
+          where: { user_id: adminId },
+          transaction,
+        });
+        await UserQualification.bulkCreate(
+          qualificationIds.map((qid) => ({
+            user_id: admin.id,
+            qualification_id: qid,
+          })),
+          { transaction }
+        );
       }
       await transaction.commit();
       return {
@@ -171,8 +235,20 @@ class AdminService {
       let sort_order = data?.sort_order || "ASC";
       let order: Order = [[sort_by, sort_order]];
       const fetchAll = limit === 0 || page === 0;
+
+      // Where condition
+      let whereCondition: any = { deletedAt: null, role: Roles.ADMIN };
+      // let center_id = data.center_id
+      //   ? data.center_id
+      //   : await centerId(userData);
+      // let center_data;
+      // if (center_id) {
+      //   whereCondition.center_id = center_id;
+      //   center_data = await Center.findById(center_id);
+      // }
+
       let userData_ = await User.findAndCountAll({
-        where: { deletedAt: null, role: Roles.ADMIN },
+        where: whereCondition,
         include: [
           {
             model: Qualifications,
@@ -183,7 +259,7 @@ class AdminService {
             model: Center,
             as: "center",
             attributes: ["id", "center_name"],
-          }
+          },
         ],
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
@@ -195,6 +271,13 @@ class AdminService {
       const response = {
         data: userData_.rows,
         pagination: pagination,
+        // center_data: center_data
+        //   ? {
+        //       id: center_data.id,
+        //       center_name: center_data.center_name,
+        //       center_address: center_data.center_address,
+        //     }
+        //   : {},
       };
       return {
         status: STATUS_CODES.SUCCESS,
@@ -227,15 +310,15 @@ class AdminService {
       }
       let deleteAdmin = await User.destroy({
         where: { id: adminId },
-        force: true
+        force: true,
       });
       let deleteUserQualification = await UserQualification.destroy({
         where: { user_id: adminId },
-        force: true
+        force: true,
       });
       let deleteCenter = await Center.destroy({
         where: { center_admin: adminId },
-        force: true
+        force: true,
       });
       return {
         status: STATUS_CODES.SUCCESS,

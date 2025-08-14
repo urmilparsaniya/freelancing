@@ -2,11 +2,12 @@ require("dotenv").config();
 import { userAuthenticationData, UserInterface } from "../../interface/user";
 import { Roles, STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
 import { Op, Order, Sequelize } from "sequelize";
-import { paginate, generateSecurePassword } from "../../helper/utils";
+import { paginate, generateSecurePassword, centerId } from "../../helper/utils";
 import { emailService } from "../../helper/emailService";
 import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
 import UserQualification from "../../database/schema/user_qualification";
+import Center from "../../database/schema/center";
 const { sequelize } = require("../../configs/database");
 
 class LearnerService {
@@ -144,7 +145,7 @@ class LearnerService {
         // Remove old qualifications
         await UserQualification.destroy({
           where: { user_id: learnerId },
-          force: true
+          force: true,
         });
 
         // Insert updated qualifications
@@ -180,8 +181,25 @@ class LearnerService {
       let sort_order = data?.sort_order || "ASC";
       let order: Order = [[sort_by, sort_order]];
       const fetchAll = limit === 0 || page === 0;
+
+      // Where condition
+      let whereCondition: any = {
+        deletedAt: null,
+        role: Roles.LEARNER,
+      };
+
+      // Filter by center_id if provided
+      let center_id = data?.center_id
+        ? data.center_id
+        : await centerId(userData);
+      let center_data;
+      if (center_id) {
+        whereCondition.center_id = center_id;
+        center_data = await Center.findById(center_id);
+      }
+
       let userData_ = await User.findAndCountAll({
-        where: { deletedAt: null, role: Roles.LEARNER },
+        where: whereCondition,
         include: [
           {
             model: Qualifications,
@@ -199,6 +217,13 @@ class LearnerService {
       const response = {
         data: userData_.rows,
         pagination: pagination,
+        center_data: center_data
+          ? {
+              id: center_data.id,
+              center_name: center_data.center_name,
+              center_address: center_data.center_address,
+            }
+          : {},
       };
       return {
         status: STATUS_CODES.SUCCESS,
@@ -232,11 +257,11 @@ class LearnerService {
       }
       let deleteLearner = await User.destroy({
         where: { id: learnerId },
-        force: true
+        force: true,
       });
       let deleteUserQualification = await UserQualification.destroy({
         where: { user_id: learnerId },
-        force: true
+        force: true,
       });
       return {
         status: STATUS_CODES.SUCCESS,

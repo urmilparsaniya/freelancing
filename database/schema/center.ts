@@ -10,6 +10,7 @@ class Center extends Model<CenterInterface> implements CenterInterface {
   public center_name!: string;
   public center_admin!: number;
   public status!: number;
+  public center_address!: string;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -33,6 +34,10 @@ Center.init(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    center_address: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    }
   },
   {
     ...BaseModel.initBaseOptions(sequelize),
