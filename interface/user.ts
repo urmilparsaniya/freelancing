@@ -41,6 +41,7 @@ export interface UserInterface {
   ethnicity?: string;
   center_address?: string;
   additional_learning_text?: string;
+  default_center_id?: number; // Optional field for default center
   additional_learning_needs?: number; // 1: Yes | 2: No | 3: Prefer not to say
 }
 

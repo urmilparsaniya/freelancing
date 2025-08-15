@@ -13,6 +13,11 @@ module.exports = {
       type: Sequelize.STRING,
       allowNull: true,
     });
+    await queryInterface.addColumn("tbl_user", "default_center_id", {
+      type: Sequelize.INTEGER,
+      allowNull: true, // Optional field for default center
+      comment: "Filed for default center, For Super Admin",
+    });
   },
 
   async down (queryInterface, Sequelize) {
@@ -23,5 +28,6 @@ module.exports = {
      * await queryInterface.dropTable('users');
      */
     await queryInterface.removeColumn("tbl_user", "additional_learning_text");
+    await queryInterface.removeColumn("tbl_user", "default_center_id");
   }
 };

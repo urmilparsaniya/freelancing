@@ -37,6 +37,7 @@ class User extends Model<UserInterface> implements UserInterface {
   public awarding_name!: string;
   public ethnicity!: string;
   public additional_learning_text!: string;
+  public default_center?: number; // Optional field for default center
   public additional_learning_needs!: number; // 1: Yes | 2: No | 3: Prefer not to say
   // timestamps!
   public readonly createdAt!: Date;
@@ -173,6 +174,11 @@ User.init(
     additional_learning_text: {
       type: DataTypes.STRING,
       allowNull: true,
+    },
+    default_center_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true, // Optional field for default center
+      comment: "Filed for default center, For Super Admin",
     }
   },
   { ...BaseModel.initBaseOptions(sequelize), tableName: TABLE_NAME.USER }

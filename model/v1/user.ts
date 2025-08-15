@@ -1,5 +1,5 @@
 require("dotenv").config();
-import { STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
+import { Roles, STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
 import { compare } from "bcrypt";
 import jwt from "jsonwebtoken";
 import {
@@ -48,6 +48,23 @@ class userAuthService {
       { where: { id: isUser.id } }
     );
     const userData = await User.findUserData(isUser.id);
+    // Check login user is Super Admin
+    if (userData.role == Roles.SUPER_ADMIN) {
+      // check if user has default center or not id not then assign default center
+      if (!userData.default_center_id) {
+        // Assign default center to user
+        const defaultCenter = await Center.findOne({
+          where: { deletedAt: null, status: 1 },
+        });
+        if (defaultCenter) {
+          await User.update(
+            { default_center_id: defaultCenter.id },
+            { where: { id: userData.id } }
+          );
+          userData.default_center_id = defaultCenter.id; // Update userData with new center
+        }
+      }
+    }
     return {
       data: userData,
       status: STATUS_CODES.SUCCESS,
