@@ -43,6 +43,10 @@ export interface UserInterface {
   additional_learning_text?: string;
   default_center_id?: number; // Optional field for default center
   additional_learning_needs?: number; // 1: Yes | 2: No | 3: Prefer not to say
+  assessors?: string;
+  iqas?: string;
+  additional_iqa_id?: number; // Optional field for additional IQA ID
+  additional_assessor_id?: number; // Optional field for additional Assessor ID
 }
 
 export interface userAuthenticationData {

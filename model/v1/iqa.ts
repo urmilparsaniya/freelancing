@@ -175,12 +175,24 @@ class IQAService {
         center_data = await Center.findById(center_id);
       }
 
+      // Qualification Management
+      let qualificationRequired = false;
+      let qualificationWhereCondition: any = {
+        deletedAt: null,
+      };
+      if (data?.user_id) {
+        qualificationWhereCondition.user_id = data.user_id;
+        qualificationRequired = true;
+      }
+
       let userData_ = await User.findAndCountAll({
         where: whereCondition,
         include: [
           {
             model: Qualifications,
             as: "qualifications",
+            required: qualificationRequired,
+            where: qualificationWhereCondition,
             through: { attributes: [] }, // prevent including join table info
           },
         ],

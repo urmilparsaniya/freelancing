@@ -6,6 +6,7 @@ import { TABLE_NAME } from "../../configs/tables";
 import { QualificationsInterface } from "../../interface/qualifications";
 import Units from "./units";
 import User from "./user";
+import UserQualification from "./user_qualification";
 
 class Qualifications
   extends Model<QualificationsInterface>
@@ -53,6 +54,7 @@ Qualifications.init(
 
 Qualifications.hasMany(Units, { foreignKey: 'qualification_id', as: 'units' });
 Units.belongsTo(Qualifications, { foreignKey: 'qualification_id', as: 'qualification' });
+Qualifications.hasMany(UserQualification, { foreignKey: 'qualification_id', as: 'userQualifications' });
 
 Qualifications.findById = async (id) => 
   Qualifications.findOne({

@@ -1,13 +1,15 @@
 require("dotenv").config();
 import { userAuthenticationData, UserInterface } from "../../interface/user";
 import { Roles, STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
-import { Op, Order, Sequelize } from "sequelize";
+import { Op, Order, Sequelize, where } from "sequelize";
 import { paginate, generateSecurePassword, centerId } from "../../helper/utils";
 import { emailService } from "../../helper/emailService";
 import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
 import UserQualification from "../../database/schema/user_qualification";
 import Center from "../../database/schema/center";
+import UserAssessor from "../../database/schema/user_assessor";
+import UserIQA from "../../database/schema/user_iqa";
 const { sequelize } = require("../../configs/database");
 
 class LearnerService {
@@ -70,6 +72,60 @@ class LearnerService {
         createUser.email,
         data.password // Use the original password before hashing
       );
+      // Associate Learner with Assessor if provided
+      if (data.assessors) {
+        const assessorIds = data.assessors
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        // Validate assessor IDs exist
+        const validAssessors = await User.findAll({
+          where: {
+            id: { [Op.in]: assessorIds },
+            role: Roles.ASSESSOR,
+            deletedAt: null,
+          },
+        });
+        if (validAssessors.length !== assessorIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some assessors are invalid",
+          };
+        }
+        await UserAssessor.bulkCreate(
+          assessorIds.map((assessorId) => ({
+            user_id: createUser.id,
+            assessor_id: assessorId,
+          }))
+        );
+      }
+      // Associate Learner with IQA if provided
+      if (data.iqas) {
+        const iqaIds = data.iqas
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        // Validate IQA IDs exist
+        const validIQAs = await User.findAll({
+          where: {
+            id: { [Op.in]: iqaIds },
+            role: Roles.IQA,
+            deletedAt: null,
+          },
+        });
+        if (validIQAs.length !== iqaIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some IQAs are invalid",
+          };
+        }
+        await UserIQA.bulkCreate(
+          iqaIds.map((iqaId) => ({
+            user_id: createUser.id,
+            iqa_id: iqaId,
+          }))
+        );
+      }
       await transaction.commit();
       return {
         data: createUser,
@@ -122,6 +178,7 @@ class LearnerService {
       // Update user data
       await User.update(data, {
         where: { id: learnerId },
+        transaction,
       });
 
       if (data.qualifications) {
@@ -156,6 +213,77 @@ class LearnerService {
           }))
         );
       }
+
+      // Update Assessor associations if provided
+      if (data.assessors) {
+        const assessorIds = data.assessors
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        // Validate assessor IDs exist
+        const validAssessors = await User.findAll({
+          where: {
+            id: { [Op.in]: assessorIds },
+            role: Roles.ASSESSOR,
+            deletedAt: null,
+          },
+        });
+        if (validAssessors.length !== assessorIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some assessors are invalid",
+          };
+        }
+        // Remove old assessor associations
+        await UserAssessor.destroy({
+          where: { user_id: learnerId },
+          force: true,
+          transaction
+        });
+        // Insert updated assessor associations
+        await UserAssessor.bulkCreate(
+          assessorIds.map((assessorId) => ({
+            user_id: +learnerId,
+            assessor_id: assessorId,
+          }))
+        );
+      }
+
+      // Update IQA associations if provided
+      if (data.iqas) {
+        const iqaIds = data.iqas
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        // Validate IQA IDs exist
+        const validIQAs = await User.findAll({
+          where: {
+            id: { [Op.in]: iqaIds },
+            role: Roles.IQA,
+            deletedAt: null,
+          },
+        });
+        if (validIQAs.length !== iqaIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some IQAs are invalid",
+          };
+        }
+        // Remove old IQA associations
+        await UserIQA.destroy({
+          where: { user_id: learnerId },
+          force: true,
+          transaction
+        });
+        // Insert updated IQA associations
+        await UserIQA.bulkCreate(
+          iqaIds.map((iqaId) => ({
+            user_id: +learnerId,
+            iqa_id: iqaId,
+          }))
+        );
+      }
+
       await transaction.commit();
       return {
         data: {},
@@ -202,6 +330,7 @@ class LearnerService {
       let whereConditionQualification: any = {
         deletedAt: null,
       };
+      let qualificationRequired = false;
       if (data.qualification_id) {
         // Convert comma-separated IDs into an array of numbers
         const qualificationIds = data.qualification_id
@@ -211,7 +340,22 @@ class LearnerService {
 
         if (qualificationIds.length > 0) {
           whereConditionQualification.id = { [Op.in]: qualificationIds };
+          qualificationRequired = true;
         }
+      }
+
+      // Where include condition
+      let whereConditionInclude: any = {
+        deletedAt: null,
+      };
+      let includeRequired = false;
+
+      // Qualification Management
+      if (data?.user_id) {
+        whereConditionQualification.user_id = data.user_id;
+        qualificationRequired = true;
+        whereConditionInclude.user_id = data.user_id;
+        includeRequired = true;
       }
 
       let userData_ = await User.findAndCountAll({
@@ -221,8 +365,28 @@ class LearnerService {
             model: Qualifications,
             as: "qualifications",
             where: whereConditionQualification,
+            required: qualificationRequired,
             through: { attributes: [] }, // prevent including join table info
           },
+          {
+            model: UserAssessor,
+            as: "assessors",
+            through: { attributes: [] },
+            where: whereConditionInclude,
+            required: includeRequired,
+          },
+          {
+            model: UserIQA,
+            as: "iqas",
+            through: { attributes: [] },
+            where: whereConditionInclude,
+            required: includeRequired,
+          },
+          {
+            model: Center,
+            as: "center",
+            attributes: ["id", "center_name", "center_address"],
+          }
         ],
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,

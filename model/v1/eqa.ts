@@ -227,19 +227,36 @@ class EQAService {
         center_data = await Center.findById(center_id);
       }
 
+      // Qualification Management
+      let includeRequired = false;
+      let includeWhereCondition: any = {
+        deletedAt: null,
+      };
+      let includeLearnerCondition: any = {
+        deletedAt: null,
+      };
+      if (data?.user_id) {
+        includeWhereCondition.user_id = data.user_id;
+        includeLearnerCondition.id = data.user_id;
+        includeRequired = true;
+      }
+
       let userData_ = await User.findAndCountAll({
         where: whereCondition,
         include: [
           {
             model: Qualifications,
             as: "qualifications",
+            required: includeRequired,
+            where: includeWhereCondition,
             through: { attributes: [] }, // prevent including join table info
           },
           {
             model: User,
             as: "learners",
+            required: includeRequired,
             through: { attributes: [] }, // prevent including join table info
-            where: { deletedAt: null, role: Roles.LEARNER },
+            where: includeLearnerCondition,
           },
         ],
         limit: fetchAll ? undefined : limit,

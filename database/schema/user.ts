@@ -36,6 +36,8 @@ class User extends Model<UserInterface> implements UserInterface {
   public access_end_date!: string;
   public awarding_name!: string;
   public ethnicity!: string;
+  public additional_iqa_id!: number; // Optional field for additional IQA ID
+  public additional_assessor_id!: number; // Optional field for additional Assessor ID
   public additional_learning_text!: string;
   public default_center?: number; // Optional field for default center
   public additional_learning_needs!: number; // 1: Yes | 2: No | 3: Prefer not to say
@@ -179,6 +181,16 @@ User.init(
       type: DataTypes.INTEGER,
       allowNull: true, // Optional field for default center
       comment: "Filed for default center, For Super Admin",
+    },
+    additional_iqa_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true, // Optional field for additional IQA ID
+      comment: "Optional field for additional IQA ID",
+    },
+    additional_assessor_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true, // Optional field for additional Assessor ID
+      comment: "Optional field for additional Assessor ID",
     }
   },
   { ...BaseModel.initBaseOptions(sequelize), tableName: TABLE_NAME.USER }
@@ -189,6 +201,20 @@ User.belongsToMany(Qualifications, {
   foreignKey: "user_id",
   otherKey: "qualification_id",
   as: "qualifications",
+});
+
+User.belongsToMany(User, {
+  through: "tbl_user_assessor",
+  foreignKey: "user_id",
+  otherKey: "assessor_id",
+  as: "assessors",
+});
+
+User.belongsToMany(User, {
+  through: "tbl_user_iqa",
+  foreignKey: "user_id",
+  otherKey: "iqa_id",
+  as: "iqas",
 });
 
 User.belongsToMany(User, {

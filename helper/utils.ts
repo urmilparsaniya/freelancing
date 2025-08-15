@@ -263,3 +263,16 @@ export const centerId = async (userData: userAuthenticationData): Promise<number
     return randomCenter ? randomCenter.id : null;
   }
 }
+
+export const qualificationUserId = async (userData: userAuthenticationData): Promise<number | null> => {
+  // If user is super admin return null
+  if (userData && userData.role === Roles.SUPER_ADMIN) {
+    return null; // Super Admin does not have a user_id
+  }
+  if (userData && userData.id) {
+    return userData.id;
+  } else {
+    // If no user_id is provided, return null
+    return null;
+  }
+}

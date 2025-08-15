@@ -7,7 +7,7 @@ import Units from "../../database/schema/units";
 import SubOutcomes from "../../database/schema/sub_outcomes";
 import OutcomeSubpoints from "../../database/schema/outcome_subpoints";
 import { Op, Order, Sequelize } from "sequelize";
-import { paginate } from "../../helper/utils";
+import { paginate, qualificationUserId } from "../../helper/utils";
 import UserQualification from "../../database/schema/user_qualification";
 const { sequelize } = require("../../configs/database");
 
@@ -247,10 +247,29 @@ class qualificationService {
 
       const fetchAll = limit === 0 || page === 0;
 
+      // User Qualifications Management
+      let userQualificationCondition: any = {
+        deletedAt: null,
+      };
+      let userQualificationRequired = false;
+      if (data?.user_id) {
+        userQualificationCondition.user_id = data.user_id;
+        userQualificationRequired = true;
+      }
+
       let qualifications = await Qualifications.findAndCountAll({
         where: { deletedAt: null },
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
+        include: [
+          {
+            model: UserQualification,
+            as: "userQualifications",
+            required: userQualificationRequired,
+            where: userQualificationCondition,
+            attributes: []
+          },
+        ],
         order,
         distinct: true,
       });

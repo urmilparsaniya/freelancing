@@ -9,4 +9,6 @@ export const TABLE_NAME = {
   ROLE: "tbl_role",
   CENTER: "tbl_center",
   USER_LEARNER: "tbl_user_learner",
+  USER_ASSESSOR: "tbl_user_assessor",
+  USER_IQA: "tbl_user_iqa",
 };
