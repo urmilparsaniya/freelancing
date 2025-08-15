@@ -40,6 +40,7 @@ export interface UserInterface {
   awarding_name?: string;
   ethnicity?: string;
   center_address?: string;
+  additional_learning_text?: string;
   additional_learning_needs?: number; // 1: Yes | 2: No | 3: Prefer not to say
 }
 

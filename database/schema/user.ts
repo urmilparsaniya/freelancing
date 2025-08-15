@@ -36,6 +36,7 @@ class User extends Model<UserInterface> implements UserInterface {
   public access_end_date!: string;
   public awarding_name!: string;
   public ethnicity!: string;
+  public additional_learning_text!: string;
   public additional_learning_needs!: number; // 1: Yes | 2: No | 3: Prefer not to say
   // timestamps!
   public readonly createdAt!: Date;
@@ -168,6 +169,10 @@ User.init(
       type: DataTypes.INTEGER,
       allowNull: true,
       defaultValue: 3, // 1: Yes | 2: No | 3: Prefer not to say
+    },
+    additional_learning_text: {
+      type: DataTypes.STRING,
+      allowNull: true,
     }
   },
   { ...BaseModel.initBaseOptions(sequelize), tableName: TABLE_NAME.USER }
