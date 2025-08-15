@@ -1,5 +1,5 @@
 // import Product from "../database/schema/product";
-import { STATUS_CODES } from "../configs/constants";
+import { Roles, STATUS_CODES } from "../configs/constants";
 import bcrypt from "bcrypt";
 import {
   S3Client,
@@ -247,6 +247,10 @@ export const cache = {
 };
 
 export const centerId = async (userData: userAuthenticationData): Promise<number | null> => {
+  // If user is super admin return null
+  if (userData && userData.role === Roles.SUPER_ADMIN) {
+    return null; // Super Admin does not have a center_id
+  }
   if (userData && userData.center_id) {
     return userData.center_id;
   } else {
