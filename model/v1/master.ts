@@ -9,6 +9,7 @@ import UserQualification from "../../database/schema/user_qualification";
 import { emailService } from "../../helper/emailService";
 import Role from "../../database/schema/role";
 import Center from "../../database/schema/center";
+import Methods from "../../database/schema/methods";
 const { sequelize } = require("../../configs/database");
 
 class MasterService {
@@ -45,6 +46,28 @@ class MasterService {
         status: STATUS_CODES.SUCCESS,
         data: centers,
         message: "Centers fetched successfully",
+      };
+    } catch (error) {
+      console.log(error);
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+      };
+    }
+  }
+
+  // Get All Methods
+  static async getAllMethods(): Promise<any> {
+    try {
+      // Fetch all methods from the database
+      const methods = await Methods.findAll({
+        where: { deletedAt: null },
+        order: [["name", "ASC"]] as Order,
+      });
+      return {
+        status: STATUS_CODES.SUCCESS,
+        data: methods,
+        message: "Methods fetched successfully",
       };
     } catch (error) {
       console.log(error);

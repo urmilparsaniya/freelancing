@@ -267,7 +267,7 @@ class qualificationService {
             as: "userQualifications",
             required: userQualificationRequired,
             where: userQualificationCondition,
-            attributes: []
+            attributes: [],
           },
         ],
         order,
@@ -420,9 +420,17 @@ class qualificationService {
         transaction,
       });
 
-      await Qualifications.destroy({
-        where: { id: qualificationId },
-        force: true,
+      await Qualifications.update(
+        {
+          name: qualificationName,
+          qualification_no: qualificationNumber,
+        },
+        {
+          where: { id: qualificationId },
+          transaction,
+        }
+      );
+      const qualificationData = await Qualifications.findByPk(qualificationId, {
         transaction,
       });
 
@@ -430,7 +438,8 @@ class qualificationService {
       const created = await this._createQualificationWithWorkbook(
         workbook,
         userData,
-        transaction
+        transaction,
+        qualificationData.id
       );
 
       await transaction.commit();
@@ -451,21 +460,33 @@ class qualificationService {
   private static async _createQualificationWithWorkbook(
     workbook: XLSX.WorkBook,
     userData: userAuthenticationData,
-    transaction: any
+    transaction: any,
+    existingQualificationId?: number
   ): Promise<any> {
     const sheetName = workbook.SheetNames[0];
     const firstSheet = workbook.Sheets[sheetName];
     const qualificationName = firstSheet["B1"]?.v?.toString().trim() || "";
     const qualificationNumber = firstSheet["B2"]?.v?.toString().trim() || "";
 
-    const qualificationData = await Qualifications.create(
-      {
-        name: qualificationName,
-        qualification_no: qualificationNumber,
-        created_by: userData.id,
-      },
-      { transaction }
-    );
+    let qualificationData;
+
+    if (existingQualificationId) {
+      // already exists → just reuse
+      qualificationData = await Qualifications.findByPk(
+        existingQualificationId,
+        { transaction }
+      );
+    } else {
+      // creating fresh qualification
+      qualificationData = await Qualifications.create(
+        {
+          name: qualificationName,
+          qualification_no: qualificationNumber,
+          created_by: userData.id,
+        },
+        { transaction }
+      );
+    }
 
     for (const sheetName of workbook.SheetNames) {
       if (!sheetName.toLowerCase().startsWith("unit")) continue;

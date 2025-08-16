@@ -13,4 +13,7 @@ router.route("/roles").get(authenticateUser, MasterController.getAllRoles);
 // Get All Centers route
 router.route("/centers").get(authenticateUser, MasterController.getAllCenters);
 
+// Get All Methods route
+router.route("/methods").get(authenticateUser, MasterController.getAllMethods);
+
 export default router;

@@ -202,6 +202,12 @@ class AssessorService {
         qualificationWhereCondition.user_id = data.user_id;
         qualificationRequired = true;
       }
+      if (data?.qualification_ids) {
+        qualificationWhereCondition.id = {
+          [Op.in]: data.qualification_ids.split(",").map((id) => parseInt(id.trim())),
+        };
+        qualificationRequired = true;
+      }
 
       let userData_ = await User.findAndCountAll({
         where: whereCondition,
