@@ -10,6 +10,7 @@ import IQA from "./v1/iqa";
 import EQA from "./v1/eqa";
 import Admin from "./v1/admin";
 import masterRoute from "./v1/master";
+import assessment from "./v1/assessment";
 
 dotenv.config();
 
@@ -82,5 +83,12 @@ export default (app: Application): void => {
   app.use(
     "/" + process.env.API_BASE_URL + "/v1/master",
     masterRoute
+  );
+
+  // Assessment Routes
+  app.use(
+    "/" + process.env.API_BASE_URL + "/v1/assessment",
+    upload.array("files"), // Use multer for multiple files
+    assessment
   );
 };

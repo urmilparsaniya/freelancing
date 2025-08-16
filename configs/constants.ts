@@ -171,3 +171,20 @@ export const Roles = {
   EQA: 6,
   ADMIN: 7,
 }
+
+export const Entity = {
+  ASSESSMENT: 'assessment',
+  LEARNER: 'learner',
+  ASSESSOR: 'assessor',
+  OBSERVER: 'observer',
+  IQA: 'iqa',
+  EQA: 'eqa',
+}
+
+export const EntityType = {
+  IMAGE: 'image',
+  VIDEO: 'video',
+  DOCUMENT: 'document',
+  AUDIO: 'audio',
+  OTHER: 'other',
+}
