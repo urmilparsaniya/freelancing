@@ -148,6 +148,7 @@ class EQAService {
         // Update User Qualifications
         await UserQualification.destroy({
           where: { user_id: id },
+          force: true,
           transaction,
         });
         await UserQualification.bulkCreate(
@@ -175,6 +176,7 @@ class EQAService {
         }
         await UserLearner.destroy({
           where: { user_id: id },
+          force: true,
           transaction,
         });
         await UserLearner.bulkCreate(

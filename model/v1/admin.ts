@@ -201,6 +201,7 @@ class AdminService {
         // Update User Qualifications
         await UserQualification.destroy({
           where: { user_id: adminId },
+          force: true,
           transaction,
         });
         await UserQualification.bulkCreate(

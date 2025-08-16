@@ -123,6 +123,7 @@ class IQAService {
         // Update User Qualifications
         await UserQualification.destroy({
           where: { user_id: id },
+          force: true, // Ensure qualifications are removed before adding new ones
           transaction,
         });
         await UserQualification.bulkCreate(
