@@ -28,10 +28,6 @@ router.route("/create").post(
       .withMessage(
         "Gender must be 1 (Male), 2 (Female), or 3 (Prefer not say)"
       ),
-    body("learning_difficulties")
-      .not()
-      .isEmpty()
-      .withMessage("Learning difficulties / mental health is required"),
     body("off_the_job_training")
       .notEmpty()
       .withMessage("Off the job training is required")
@@ -75,10 +71,6 @@ router.route("/update/:id").put(
       .withMessage(
         "Gender must be 1 (Male), 2 (Female), or 3 (Prefer not say)"
       ),
-    body("learning_difficulties")
-      .not()
-      .isEmpty()
-      .withMessage("Learning difficulties / mental health is required"),
     body("off_the_job_training")
       .notEmpty()
       .withMessage("Off the job training is required")
