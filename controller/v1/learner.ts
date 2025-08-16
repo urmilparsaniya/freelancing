@@ -72,6 +72,27 @@ class learnerController {
     }
   }
 
+  // Detail Learner method
+  static async detailLearner(req: Request, res: Response): Promise<void> {
+    try {
+      let learnerId = req.params.id as string | number;
+      let userData = req.headers["user_info"] as userAuthenticationData;
+      let request = await LearnerService.detailLearner(learnerId, userData);
+      if (request.status !== STATUS_CODES.SUCCESS) {
+        res.handler.errorResponse(request.status, request.message);
+        return;
+      }
+      res.handler.successResponse(
+        request.status,
+        request.data,
+        request.message
+      );
+    } catch (error) {
+      error = "server error";
+      res.handler.serverError(error);
+    }
+  }
+
   // Delete Learner method
   static async deleteLearner(req: Request, res: Response): Promise<void> {
     try {

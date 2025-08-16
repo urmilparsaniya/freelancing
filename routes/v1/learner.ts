@@ -104,6 +104,8 @@ router.route("/update/:id").put(
 
 router.route("/list").get(authenticateUser, learnerController.listLearner);
 
+router.route('/detail/:id').get(authenticateUser, learnerController.detailLearner)
+
 router.route('/delete/:id').delete(authenticateUser, learnerController.deleteLearner)
 
 export default router;

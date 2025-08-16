@@ -420,6 +420,56 @@ class LearnerService {
     }
   }
 
+  // Detail Learner
+  static async detailLearner(
+    learnerId: number | string,
+    userData: userAuthenticationData
+  ) {
+    try {
+      // Check if learner exists
+      let isValidUser = await User.findOne({
+        where: { id: learnerId, deletedAt: null, role: Roles.LEARNER },
+        include: [
+          {
+            model: Qualifications,
+            as: "qualifications",
+            required: false,
+            through: { attributes: [] }, // prevent including join table info
+          },
+          {
+            model: User,
+            as: "assessors",
+            required: false,
+            through: { attributes: [] },
+          },
+          {
+            model: User,
+            as: "iqas",
+            required: false,
+            through: { attributes: [] },
+          },
+          {
+            model: Center,
+            as: "center",
+            required: false,
+            attributes: ["id", "center_name", "center_address"],
+          }
+        ],
+      });
+      return {
+        status: STATUS_CODES.SUCCESS,
+        data: isValidUser,
+        message: "Learner detail fetched successfully",
+      };
+    } catch (error) {
+      console.log(error);
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+      };
+    }
+  }
+
   // Delete Learner
   static async deleteLearner(
     learnerId: number | string,

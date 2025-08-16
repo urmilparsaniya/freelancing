@@ -192,6 +192,7 @@ class qualificationService {
           const outcomeEntry: any = {
             number: fullOutcomeNumber,
             description: outcome.description,
+            id: outcome.id,
           };
 
           if (outcome.outcomeSubpoints && outcome.outcomeSubpoints.length) {
@@ -206,6 +207,7 @@ class qualificationService {
         outcomes.sort((a, b) => this.compareOutcomeNumbers(a.number, b.number));
 
         result.units.push({
+          id: unit.id,
           unitTitle: unit.unit_title,
           unitNumber: unit.unit_number,
           outcomes, // 🔁 directly attached here
