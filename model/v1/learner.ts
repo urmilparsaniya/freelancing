@@ -369,14 +369,14 @@ class LearnerService {
             through: { attributes: [] }, // prevent including join table info
           },
           {
-            model: UserAssessor,
+            model: User,
             as: "assessors",
             through: { attributes: [] },
             where: whereConditionInclude,
             required: includeRequired,
           },
           {
-            model: UserIQA,
+            model: User,
             as: "iqas",
             through: { attributes: [] },
             where: whereConditionInclude,
