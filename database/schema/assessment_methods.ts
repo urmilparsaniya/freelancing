@@ -3,40 +3,31 @@ import { DataTypes } from "sequelize";
 const { sequelize } = require("../../configs/database");
 import BaseModel from "./base";
 import { TABLE_NAME } from "../../configs/tables";
-import { AssessmentInterface } from "../../interface/assessment";
+import { AssessmentMethodInterface } from "../../interface/assessment_methods";
 
-class Assessment
-  extends Model<AssessmentInterface>
-  implements AssessmentInterface
+class AssessmentMethod
+  extends Model<AssessmentMethodInterface>
+  implements AssessmentMethodInterface
 {
   public id!: number;
-  public title!: string;
-  public date!: string;
-  public location!: string;
-  public details!: string;
+  public assessment_id!: number;
+  public method_id!: number;
   public status!: number;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
+  public deletedAt?: Date;
 }
 
-Assessment.init(
+AssessmentMethod.init(
   {
     ...BaseModel.initBaseModel(sequelize),
-    title: {
-      type: DataTypes.STRING,
+    assessment_id: {
+      type: DataTypes.INTEGER,
       allowNull: true,
     },
-    date: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    location: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    details: {
-      type: DataTypes.TEXT,
+    method_id: {
+      type: DataTypes.INTEGER,
       allowNull: true,
     },
     status: {
@@ -47,8 +38,8 @@ Assessment.init(
   },
   {
     ...BaseModel.initBaseOptions(sequelize),
-    tableName: TABLE_NAME.ASSESSMENT,
+    tableName: TABLE_NAME.ASSESSMENT_METHODS,
   }
 );
 
-export default Assessment;
+export default AssessmentMethod;

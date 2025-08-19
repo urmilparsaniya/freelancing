@@ -9,26 +9,18 @@ module.exports = {
      * Example:
      * await queryInterface.createTable('users', { id: Sequelize.INTEGER });
      */
-    await queryInterface.createTable("tbl_assessment", {
+    await queryInterface.createTable("tbl_assessment_units", {
       id: {
         type: Sequelize.BIGINT, // Using BIGINT for large range
         autoIncrement: true,
         primaryKey: true,
       },
-      title: {
-        type: Sequelize.STRING,
+      assessment_id: {
+        type: Sequelize.INTEGER,
         allowNull: true,
       },
-      date: {
-        type: Sequelize.STRING,
-        allowNull: true,
-      },
-      location: {
-        type: Sequelize.STRING,
-        allowNull: true,
-      },
-      details: {
-        type: Sequelize.TEXT,
+      unit_id: {
+        type: Sequelize.INTEGER,
         allowNull: true,
       },
       status: {
@@ -58,6 +50,6 @@ module.exports = {
      * Example:
      * await queryInterface.dropTable('users');
      */
-    await queryInterface.dropTable("tbl_assessment");
+    await queryInterface.dropTable("tbl_assessment_units");
   }
 };

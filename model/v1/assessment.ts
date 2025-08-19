@@ -16,6 +16,8 @@ import Units from "../../database/schema/units";
 import Methods from "../../database/schema/methods";
 import { v4 as uuidv4 } from "uuid";
 import { extname } from "path";
+import AssessmentMethod from "../../database/schema/assessment_methods";
+import AssessmentUnits from "../../database/schema/assessment_units";
 
 class AssessmentService {
   // Create Assessment
@@ -26,31 +28,6 @@ class AssessmentService {
   ): Promise<any> {
     const transaction = await sequelize.transaction();
     try {
-      // Validate unit_id and method_id is exists
-      let unit = await Units.findOne({
-        where: {
-          id: data.unit_id,
-          deletedAt: null,
-        },
-      });
-      if (!unit) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Unit not found",
-        };
-      }
-      let method = await Methods.findOne({
-        where: {
-          id: data.method_id,
-          deletedAt: null,
-        },
-      });
-      if (!method) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Method not found",
-        };
-      }
       // Create Assessment
       let assessment = await Assessment.create(data, { transaction });
       if (files && files.length > 0) {
@@ -68,7 +45,56 @@ class AssessmentService {
           }, { transaction });
         }
       }
-      // await transaction.commit();
+      // Create Assessment Methods
+      if (data.method_ids) {
+        const methodsIds = data.method_ids
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        // Validate methods exist
+        console.log(methodsIds)
+        const validMethods = await Methods.findAll({
+          where: { id: methodsIds, deletedAt: null },
+        });
+        if (validMethods.length !== methodsIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some methods are invalid",
+          };
+        }
+        await AssessmentMethod.bulkCreate(
+          methodsIds.map((mid) => ({
+            assessment_id: assessment.id,
+            method_id: mid,
+          })),
+          { transaction }
+        );
+      }
+      // Create Assessment Units
+      if (data.unit_ids) {
+        const unitIds = data.unit_ids
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        // Validate unit exist 
+        const validUnits = await Units.findAll({
+          where: { id: unitIds, deletedAt: null },
+        });
+        if (validUnits.length !== unitIds.length) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Some units are invalid",
+          };
+        }
+        await AssessmentUnits.bulkCreate(
+          unitIds.map((uid) => ({
+            assessment_id: assessment.id,
+            unit_id: uid,
+          })),
+          { transaction }
+        );
+      }
+      await transaction.commit();
       return {
         status: STATUS_CODES.SUCCESS,
         data: assessment,
@@ -105,6 +131,27 @@ class AssessmentService {
     }
 
     return EntityType.OTHER;
+  }
+
+  // Update Assessment
+  static async updateAssessment(
+    data: any,
+    userData: userAuthenticationData
+  ): Promise<any> {
+    try {
+      
+      return {
+        status: STATUS_CODES.SUCCESS,
+        data: null,
+        message: "Assessment updated successfully",
+      };
+    } catch (error) {
+      console.error("Error updating assessment:", error);
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: "Server error",
+      };
+    }
   }
 }
 

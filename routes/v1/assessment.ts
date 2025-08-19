@@ -15,11 +15,16 @@ router
       body("date").trim().notEmpty().withMessage("Date is required"),
       body("location").trim().notEmpty().withMessage("Location is required"),
       body("details").trim().notEmpty().withMessage("Details are required"),
-      body("unit_id").notEmpty().withMessage("Unit ID is required"),
-      body("method_id").notEmpty().withMessage("Method ID is required"),
+      body("unit_ids").notEmpty().withMessage("Unit ID is required"),
+      body("method_ids").notEmpty().withMessage("Method ID is required"),
     ]), // Add any necessary validation here
     authenticateUser, 
     assessmentController.createAssessment
   );
+
+// Update Assessment
+router
+  .route("/update/:id")
+  .put(authenticateUser, assessmentController.updateAssessment);
 
 export default router;

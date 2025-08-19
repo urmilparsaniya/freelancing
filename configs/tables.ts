@@ -14,4 +14,6 @@ export const TABLE_NAME = {
   METHODS: "tbl_methods",
   ASSESSMENT: "tbl_assessment",
   IMAGE: "tbl_image",
+  ASSESSMENT_METHODS: "tbl_assessment_methods",
+  ASSESSMENT_UNITS: "tbl_assessment_units"
 };
