@@ -18,6 +18,7 @@ router
       body("details").trim().notEmpty().withMessage("Details are required"),
       body("unit_ids").notEmpty().withMessage("Unit ID is required"),
       body("method_ids").notEmpty().withMessage("Method ID is required"),
+      body("learner_id").notEmpty().withMessage("Learner Id is required")
     ]), // Add any necessary validation here
     authenticateUser, 
     assessmentController.createAssessment

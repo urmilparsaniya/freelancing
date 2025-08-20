@@ -8,6 +8,8 @@ import Methods from "./methods";
 import Units from "./units";
 import Image from "./images";
 import { Entity } from "../../configs/constants";
+import AssessmentLearner from "./assessment_learners";
+import User from "./user";
 
 class Assessment
   extends Model<AssessmentInterface>
@@ -19,6 +21,8 @@ class Assessment
   public location!: string;
   public details!: string;
   public status!: number;
+  public assessor_id!: number;
+  public center_id!: number;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -48,6 +52,14 @@ Assessment.init(
       allowNull: true,
       defaultValue: 1,
     },
+    assessor_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    center_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    }
   },
   {
     ...BaseModel.initBaseOptions(sequelize),
@@ -76,5 +88,18 @@ Assessment.hasMany(Image, {
     entity_type: Entity.ASSESSMENT
   }
 });
+
+Assessment.belongsToMany(User, {
+  through: 'tbl_assessment_learner',
+  foreignKey: "assessment_id",
+  otherKey: "learner_id",
+  as: "learners"
+})
+
+Assessment.hasOne(User, {
+  foreignKey: "id",
+  sourceKey: "assessor_id",
+  as: "assessor"
+})
 
 export default Assessment;
