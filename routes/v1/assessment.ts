@@ -41,7 +41,7 @@ router
 
 // Get Assessment
 router
-  .route("/get/:id")
+  .route("/detail/:id")
   .get(authenticateUser, assessmentController.getAssessment);
 
 export default router;

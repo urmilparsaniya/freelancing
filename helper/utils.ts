@@ -161,6 +161,7 @@ export const deleteFileOnAWS = async (file: string): Promise<boolean> => {
     };
     const command = new DeleteObjectCommand(params);
     await s3Client.send(command);
+    console.log("File deleted successfully from AWS S3.");
     return true; // Return true on successful deletion
   } catch (error) {
     console.error("Error deleting file from AWS S3:", error);
