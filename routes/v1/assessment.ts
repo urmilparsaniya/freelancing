@@ -7,6 +7,7 @@ const authenticator = new Authenticator();
 const authenticateUser = authenticator.authenticateUser;
 import assessmentController from "../../controller/v1/assessment";
 
+// Create Assessment
 router
   .route("/create")
   .post(
@@ -26,5 +27,21 @@ router
 router
   .route("/update/:id")
   .put(authenticateUser, assessmentController.updateAssessment);
+
+
+// List Assessment
+router
+  .route("/list")
+  .get(authenticateUser, assessmentController.listAssessment);
+
+// Delete Assessment
+router
+  .route("/delete/:id")
+  .delete(authenticateUser, assessmentController.deleteAssessment);
+
+// Get Assessment
+router
+  .route("/get/:id")
+  .get(authenticateUser, assessmentController.getAssessment);
 
 export default router;

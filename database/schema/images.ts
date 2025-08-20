@@ -9,6 +9,7 @@ class Image
   extends Model<ImageInterface>
   implements ImageInterface
 {
+  public id!: number;
   public entity_type!: string;
   public entity_id!: number;
   public image!: string;

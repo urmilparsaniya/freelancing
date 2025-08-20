@@ -4,6 +4,10 @@ const { sequelize } = require("../../configs/database");
 import BaseModel from "./base";
 import { TABLE_NAME } from "../../configs/tables";
 import { AssessmentInterface } from "../../interface/assessment";
+import Methods from "./methods";
+import Units from "./units";
+import Image from "./images";
+import { Entity } from "../../configs/constants";
 
 class Assessment
   extends Model<AssessmentInterface>
@@ -50,5 +54,27 @@ Assessment.init(
     tableName: TABLE_NAME.ASSESSMENT,
   }
 );
+
+Assessment.belongsToMany(Methods, {
+  through: 'tbl_assessment_methods',
+  foreignKey: "assessment_id",
+  otherKey: "method_id",
+  as: "methods",
+});
+
+Assessment.belongsToMany(Units, {
+  through: 'tbl_assessment_units',
+  foreignKey: "assessment_id",
+  otherKey: "unit_id",
+  as: "units",
+});
+
+Assessment.hasMany(Image, {
+  foreignKey: "entity_id",
+  as: "images",
+  scope: {
+    entity_type: Entity.ASSESSMENT
+  }
+});
 
 export default Assessment;
