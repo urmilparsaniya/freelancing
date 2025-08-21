@@ -41,6 +41,9 @@ class AssessmentService {
   ): Promise<any> {
     const transaction = await sequelize.transaction();
     try {
+      if ("id" in data) {
+        delete data.id;
+      }
       // Check if Logged in user is not from admin | assessor throw an error
       let userData_ = await User.findOne({
         where: {
@@ -558,6 +561,14 @@ class AssessmentService {
           learnerRequired = true;
         }
       }
+      let whereQualificationCondition: any = {
+        deletedAt: null,
+      }
+      let requiredQualification = false
+      if (data.qualification_id) {
+        whereQualificationCondition.id = data.qualification_id;
+        requiredQualification = true
+      }
 
       let assessment_ = await Assessment.findAndCountAll({
         where: whereCondition,
@@ -594,6 +605,12 @@ class AssessmentService {
             as: "assessor",
             required: false,
           },
+          {
+            model: Qualifications,
+            as: "qualification",
+            required: requiredQualification,
+            where: whereQualificationCondition
+          }
         ],
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,

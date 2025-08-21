@@ -10,6 +10,7 @@ import Image from "./images";
 import { Entity } from "../../configs/constants";
 import AssessmentLearner from "./assessment_learners";
 import User from "./user";
+import Qualifications from "./qualifications";
 
 class Assessment
   extends Model<AssessmentInterface>
@@ -23,6 +24,7 @@ class Assessment
   public status!: number;
   public assessor_id!: number;
   public center_id!: number;
+  public qualification_id!: number;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -57,6 +59,10 @@ Assessment.init(
       allowNull: true,
     },
     center_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    qualification_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
     }
@@ -100,6 +106,12 @@ Assessment.hasOne(User, {
   foreignKey: "id",
   sourceKey: "assessor_id",
   as: "assessor"
+})
+
+Assessment.hasOne(Qualifications, {
+  foreignKey: "id",
+  sourceKey: "qualification_id",
+  as: "qualification"
 })
 
 export default Assessment;
