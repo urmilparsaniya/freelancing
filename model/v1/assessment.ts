@@ -64,35 +64,6 @@ class AssessmentService {
       // Create Assessment
       let assessment = await Assessment.create(data, { transaction });
 
-      if (files && files.length > 0) {
-        for (const file of files) {
-          try {
-            const extension = extname(file.originalname);
-            const mainFileName = `assessment/${uuidv4()}${extension}`;
-            const fileUrl = await uploadFileOnAWS(file, mainFileName);
-            const fileType = await this.getFileType(file.mimetype);
-
-            // Create File
-            await Image.create(
-              {
-                entity_type: Entity.ASSESSMENT,
-                entity_id: assessment.id, // Remove + operator as assessment.id is already a number
-                image: fileUrl,
-                image_type: fileType,
-              },
-              { transaction }
-            );
-          } catch (fileError) {
-            console.error("Error uploading file:", fileError);
-            await transaction.rollback();
-            return {
-              status: STATUS_CODES.SERVER_ERROR,
-              message: "Error uploading file",
-            };
-          }
-        }
-      }
-
       // Create Assessment Methods
       if (data.method_ids) {
         try {
@@ -206,6 +177,39 @@ class AssessmentService {
         }
       }
 
+      if (files && files.length > 0) {
+        for (const file of files) {
+          try {
+            const extension = extname(file.originalname);
+            const mainFileName = `assessment/${uuidv4()}${extension}`;
+            const fileUrl = await uploadFileOnAWS(file, mainFileName);
+            const fileType = await this.getFileType(file.mimetype);
+            const fileSize = file.size // size in bytes
+            const fileName = file.originalname
+
+            // Create File
+            await Image.create(
+              {
+                entity_type: Entity.ASSESSMENT,
+                entity_id: assessment.id, // Remove + operator as assessment.id is already a number
+                image: fileUrl,
+                image_type: fileType,
+                image_name: fileName,
+                image_size: fileSize
+              },
+              { transaction }
+            );
+          } catch (fileError) {
+            console.error("Error uploading file:", fileError);
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.SERVER_ERROR,
+              message: "Error uploading file",
+            };
+          }
+        }
+      }
+
       await transaction.commit();
       return {
         status: STATUS_CODES.SUCCESS,
@@ -277,83 +281,6 @@ class AssessmentService {
           status: STATUS_CODES.NOT_FOUND,
           message: "Assessment not found",
         };
-      }
-
-      // Handle file uploads first
-      if (files && files.length > 0) {
-        for (const file of files) {
-          try {
-            const extension = extname(file.originalname);
-            const mainFileName = `assessment/${uuidv4()}${extension}`;
-            const fileUrl = await uploadFileOnAWS(file, mainFileName);
-            const fileType = await this.getFileType(file.mimetype);
-
-            // Create File
-            await Image.create(
-              {
-                entity_type: Entity.ASSESSMENT,
-                entity_id: assessment.id, // Remove + operator as assessment.id is already a number
-                image: fileUrl,
-                image_type: fileType,
-              },
-              { transaction }
-            );
-          } catch (fileError) {
-            console.error("Error uploading file:", fileError);
-            await transaction.rollback();
-            return {
-              status: STATUS_CODES.SERVER_ERROR,
-              message: "Error uploading file",
-            };
-          }
-        }
-      }
-
-      // Handle file deletions - fix race condition
-      if (data.delete_files) {
-        try {
-          const deleteFiles: number[] = data.delete_files
-            .split(",")
-            .map((id) => parseInt(id.trim()));
-
-          // Fetch images before deletion to get file URLs
-          const imagesToDelete = await Image.findAll({
-            where: {
-              id: { [Op.in]: deleteFiles },
-              entity_type: Entity.ASSESSMENT,
-              entity_id: assessment.id,
-            },
-            transaction,
-          });
-
-          // Delete from database first
-          await Image.destroy({
-            where: {
-              id: { [Op.in]: deleteFiles },
-              entity_type: Entity.ASSESSMENT,
-              entity_id: assessment.id,
-            },
-            force: true,
-            transaction,
-          });
-
-          // Delete files from AWS after database deletion
-          for (const image of imagesToDelete) {
-            try {
-              await deleteFileOnAWS(image.image);
-            } catch (awsError) {
-              console.error("Error deleting file from AWS:", awsError);
-              // Continue with other deletions even if one fails
-            }
-          }
-        } catch (deleteError) {
-          console.error("Error deleting files:", deleteError);
-          await transaction.rollback();
-          return {
-            status: STATUS_CODES.SERVER_ERROR,
-            message: "Error deleting files",
-          };
-        }
       }
 
       // Update Assessment Methods
@@ -500,6 +427,87 @@ class AssessmentService {
           status: STATUS_CODES.SERVER_ERROR,
           message: "Error updating assessment",
         };
+      }
+
+      // Handle file uploads first
+      if (files && files.length > 0) {
+        for (const file of files) {
+          try {
+            const extension = extname(file.originalname);
+            const mainFileName = `assessment/${uuidv4()}${extension}`;
+            const fileUrl = await uploadFileOnAWS(file, mainFileName);
+            const fileType = await this.getFileType(file.mimetype);
+            const fileSize = file.size
+            const fileName = file.originalname
+
+            // Create File
+            await Image.create(
+              {
+                entity_type: Entity.ASSESSMENT,
+                entity_id: assessment.id, // Remove + operator as assessment.id is already a number
+                image: fileUrl,
+                image_type: fileType,
+                image_name: fileName,
+                image_size: fileSize
+              },
+              { transaction }
+            );
+          } catch (fileError) {
+            console.error("Error uploading file:", fileError);
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.SERVER_ERROR,
+              message: "Error uploading file",
+            };
+          }
+        }
+      }
+
+      // Handle file deletions - fix race condition
+      if (data.delete_files) {
+        try {
+          const deleteFiles: number[] = data.delete_files
+            .split(",")
+            .map((id) => parseInt(id.trim()));
+
+          // Fetch images before deletion to get file URLs
+          const imagesToDelete = await Image.findAll({
+            where: {
+              id: { [Op.in]: deleteFiles },
+              entity_type: Entity.ASSESSMENT,
+              entity_id: assessment.id,
+            },
+            transaction,
+          });
+
+          // Delete from database first
+          await Image.destroy({
+            where: {
+              id: { [Op.in]: deleteFiles },
+              entity_type: Entity.ASSESSMENT,
+              entity_id: assessment.id,
+            },
+            force: true,
+            transaction,
+          });
+
+          // Delete files from AWS after database deletion
+          for (const image of imagesToDelete) {
+            try {
+              await deleteFileOnAWS(image.image);
+            } catch (awsError) {
+              console.error("Error deleting file from AWS:", awsError);
+              // Continue with other deletions even if one fails
+            }
+          }
+        } catch (deleteError) {
+          console.error("Error deleting files:", deleteError);
+          await transaction.rollback();
+          return {
+            status: STATUS_CODES.SERVER_ERROR,
+            message: "Error deleting files",
+          };
+        }
       }
 
       await transaction.commit();

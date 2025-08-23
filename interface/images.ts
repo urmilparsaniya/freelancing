@@ -7,4 +7,6 @@ export interface ImageInterface {
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date;
+  image_name?: string;
+  image_size?: string;
 }

@@ -14,6 +14,8 @@ class Image
   public entity_id!: number;
   public image!: string;
   public image_type!: string;
+  public image_name!: string;
+  public image_size!: string;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -37,6 +39,14 @@ Image.init(
     image_type: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    image_name: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    image_size: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {
