@@ -556,7 +556,7 @@ class AssessmentService {
       });
       if (isLearner_) {
         learnerRequired = true;
-        learnerWhereCondition.learner_id = isLearner_.id;
+        learnerWhereCondition.id = isLearner_.id;
       }
       if (data.learner_id) {
         const learnerIds = data.learner_id
