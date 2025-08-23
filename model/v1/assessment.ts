@@ -846,8 +846,8 @@ class AssessmentService {
         };
       }
 
-      const newStatus = data.status;
-      const currentStatus = assessment.status;
+      const newStatus = data.assessment_status;
+      const currentStatus = assessment.assessment_status;
 
       // Validation rules
       if (
@@ -873,7 +873,8 @@ class AssessmentService {
       }
 
       // Update only if valid
-      assessment.status = newStatus;
+      assessment.assessment_status = newStatus;
+      assessment.feedback = data.feedback
       await assessment.save();
 
       return {

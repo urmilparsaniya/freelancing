@@ -30,5 +30,6 @@ module.exports = {
      * await queryInterface.dropTable('users');
      */
     await queryInterface.removeColumn("tbl_assessment", "assessment_status");
+    await queryInterface.removeColumn("tbl_assessment", "feedback");
   }
 };
