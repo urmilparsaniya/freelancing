@@ -119,7 +119,7 @@ class assessmentController {
   // Update Assessment Status
   static async updateAssessmentStatus(req: Request, res: Response): Promise<void> {
     try {
-      let assessmentId: string = req.params.assessmentStatus; 
+      let assessmentId: string = req.params.id; 
       let data = req.body;
       let userData = req.headers["user_info"] as userAuthenticationData;
       let request = await AssessmentService.updateAssessmentStatus(data, assessmentId, userData);

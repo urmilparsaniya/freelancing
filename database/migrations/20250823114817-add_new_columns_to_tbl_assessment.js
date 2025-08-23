@@ -16,6 +16,10 @@ module.exports = {
         "1: create | 2: learner agreed | 3: assessor reject | 4: completed",
       defaultValue: 1
     });
+    await queryInterface.addColumn("tbl_assessment", "feedback", {
+      type: Sequelize.TEXT,
+      allowNull: true,
+    });
   },
 
   async down (queryInterface, Sequelize) {

@@ -9,6 +9,7 @@ export interface AssessmentInterface {
   center_id: number;
   qualification_id: number;
   assessment_status: number;
+  feedback: string;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;

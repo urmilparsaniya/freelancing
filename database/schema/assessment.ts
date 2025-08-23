@@ -26,6 +26,7 @@ class Assessment
   public center_id!: number;
   public qualification_id!: number;
   public assessment_status!: number;
+  public feedback!: string;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -72,6 +73,10 @@ Assessment.init(
       allowNull: true,
       defaultValue: 1,
       comment: "1: create | 2: learner agreed | 3: assessor reject | 4: completed"
+    },
+    feedback: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     }
   },
   {
