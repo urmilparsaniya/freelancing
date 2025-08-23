@@ -182,7 +182,7 @@ export const Entity = {
 }
 
 export const EntityType = {
-  IMAGE: 'image',
+  IMAGE: 'images',
   VIDEO: 'video',
   DOCUMENT: 'document',
   AUDIO: 'audio',
