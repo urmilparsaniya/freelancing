@@ -8,7 +8,8 @@ class assessmentController {
   static async createAssessment(req: Request, res: Response): Promise<void> {
     try {
       let data = req.body;
-      let files = req.files;
+      //@ts-ignore
+      let files = req.files?.files || [];
       let userData = req.headers["user_info"] as userAuthenticationData;
       let request = await AssessmentService.createAssessment(data, userData, files);
       if (request.status !== STATUS_CODES.SUCCESS) {
@@ -31,9 +32,12 @@ class assessmentController {
     try {
       let data = req.body;
       let userData = req.headers["user_info"] as userAuthenticationData;
-      let files = req.files;
+      //@ts-ignore
+      let files = req.files?.files || [];
+      //@ts-ignore
+      let learnerFiles = req.files?.learner_upload_files || [];
       let assessmentId = req.params.id;
-      let request = await AssessmentService.updateAssessment(data, userData, files, assessmentId);
+      let request = await AssessmentService.updateAssessment(data, userData, files, assessmentId, learnerFiles);
       if (request.status !== STATUS_CODES.SUCCESS) {
         res.handler.errorResponse(request.status, request.message);
         return;
@@ -97,6 +101,28 @@ class assessmentController {
       let assessmentId = req.params.id;
       let userData = req.headers["user_info"] as userAuthenticationData;
       let request = await AssessmentService.getAssessmentById(assessmentId, userData);
+      if (request.status !== STATUS_CODES.SUCCESS) {
+        res.handler.errorResponse(request.status, request.message);
+        return;
+      }
+      res.handler.successResponse(
+        request.status,
+        request.data,
+        request.message
+      );
+    } catch (error) {
+      error = "server error";
+      res.handler.serverError(error);
+    }
+  }
+
+  // Update Assessment Status
+  static async updateAssessmentStatus(req: Request, res: Response): Promise<void> {
+    try {
+      let assessmentId: string = req.params.assessmentStatus; 
+      let data = req.body;
+      let userData = req.headers["user_info"] as userAuthenticationData;
+      let request = await AssessmentService.updateAssessmentStatus(data, assessmentId, userData);
       if (request.status !== STATUS_CODES.SUCCESS) {
         res.handler.errorResponse(request.status, request.message);
         return;

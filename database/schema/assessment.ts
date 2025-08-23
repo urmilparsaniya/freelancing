@@ -25,6 +25,7 @@ class Assessment
   public assessor_id!: number;
   public center_id!: number;
   public qualification_id!: number;
+  public assessment_status!: number;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -65,6 +66,12 @@ Assessment.init(
     qualification_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
+    },
+    assessment_status: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+      comment: "1: create | 2: learner agreed | 3: assessor reject | 4: completed"
     }
   },
   {
@@ -94,6 +101,14 @@ Assessment.hasMany(Image, {
     entity_type: Entity.ASSESSMENT
   }
 });
+
+Assessment.hasMany(Image, {
+  foreignKey: "entity_id",
+  as: "learner_image",
+  scope: {
+    entity_type: Entity.LEARNER_ASSESSMENT
+  }
+})
 
 Assessment.belongsToMany(User, {
   through: 'tbl_assessment_learner',

@@ -8,6 +8,7 @@ export interface AssessmentInterface {
   assessor_id: number;
   center_id: number;
   qualification_id: number;
+  assessment_status: number;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;

@@ -17,6 +17,7 @@ declare module "express" {
   interface Request {
     file?: MulterFile; // Optional file property for multer
     files?: MulterFile[]; // Optional files property for multer
+    learner_upload_files?: MulterFile[];
   }
 }
 

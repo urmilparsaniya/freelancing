@@ -1,6 +1,7 @@
 require("dotenv").config();
 import { userAuthenticationData, UserInterface } from "../../interface/user";
 import {
+  AssessmentStatus,
   Entity,
   EntityType,
   Roles,
@@ -61,6 +62,7 @@ class AssessmentService {
       }
       data.assessor_id = userData_.id;
       data.center_id = userData_.center_id;
+      data.assessment_status = AssessmentStatus.ASSESSMENT_CREATE;
       // Create Assessment
       let assessment = await Assessment.create(data, { transaction });
 
@@ -184,8 +186,8 @@ class AssessmentService {
             const mainFileName = `assessment/${uuidv4()}${extension}`;
             const fileUrl = await uploadFileOnAWS(file, mainFileName);
             const fileType = await this.getFileType(file.mimetype);
-            const fileSize = file.size // size in bytes
-            const fileName = file.originalname
+            const fileSize = file.size; // size in bytes
+            const fileName = file.originalname;
 
             // Create File
             await Image.create(
@@ -195,7 +197,7 @@ class AssessmentService {
                 image: fileUrl,
                 image_type: fileType,
                 image_name: fileName,
-                image_size: fileSize
+                image_size: fileSize,
               },
               { transaction }
             );
@@ -255,7 +257,8 @@ class AssessmentService {
     data: any,
     userData: userAuthenticationData,
     files: any,
-    assessmentId: string
+    assessmentId: string,
+    learnerFiles: any
   ): Promise<any> {
     const transaction = await sequelize.transaction();
     try {
@@ -263,7 +266,7 @@ class AssessmentService {
       let userData_ = await User.findOne({
         where: {
           id: userData.id,
-          role: { [Op.in]: [Roles.ADMIN, Roles.ASSESSOR] },
+          role: { [Op.in]: [Roles.ADMIN, Roles.ASSESSOR, Roles.LEARNER] },
         },
       });
       if (!userData_) {
@@ -417,7 +420,14 @@ class AssessmentService {
         }
       }
 
+      let isLearner_ = await User.findOne({
+        where: { id: userData.id, role: Roles.LEARNER },
+      });
       // Update Assessment
+      // Check if login user is learner and have uploaded learner images then changes assessment_status
+      if (learnerFiles && learnerFiles.length > 0 && isLearner_) {
+        data.assessment_status = AssessmentStatus.LEARNER_AGREED;
+      }
       try {
         await assessment.update(data, { transaction });
       } catch (updateError) {
@@ -437,8 +447,8 @@ class AssessmentService {
             const mainFileName = `assessment/${uuidv4()}${extension}`;
             const fileUrl = await uploadFileOnAWS(file, mainFileName);
             const fileType = await this.getFileType(file.mimetype);
-            const fileSize = file.size
-            const fileName = file.originalname
+            const fileSize = file.size;
+            const fileName = file.originalname;
 
             // Create File
             await Image.create(
@@ -448,7 +458,7 @@ class AssessmentService {
                 image: fileUrl,
                 image_type: fileType,
                 image_name: fileName,
-                image_size: fileSize
+                image_size: fileSize,
               },
               { transaction }
             );
@@ -458,6 +468,39 @@ class AssessmentService {
             return {
               status: STATUS_CODES.SERVER_ERROR,
               message: "Error uploading file",
+            };
+          }
+        }
+      }
+
+      // Handle file upload of learner
+      if (learnerFiles && learnerFiles.length > 0) {
+        for (const learnerFile of learnerFiles) {
+          try {
+            const extension = extname(learnerFile.originalname);
+            const mainFileName = `learner/${uuidv4()}${extension}`;
+            const fileUrl = await uploadFileOnAWS(learnerFile, mainFileName);
+            const fileType = await this.getFileType(learnerFile.mimetype);
+            const fileSize = learnerFile.size;
+            const fileName = learnerFile.originalname;
+            // Create Learner File
+            await Image.create(
+              {
+                entity_type: Entity.LEARNER_ASSESSMENT,
+                entity_id: assessment.id,
+                image: fileUrl,
+                image_type: fileType,
+                image_name: fileName,
+                image_size: fileSize,
+              },
+              { transaction }
+            );
+          } catch (error) {
+            console.log("Error uploading learner file:", error);
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.SERVER_ERROR,
+              message: "Error uploading learner file",
             };
           }
         }
@@ -571,11 +614,11 @@ class AssessmentService {
       }
       let whereQualificationCondition: any = {
         deletedAt: null,
-      }
-      let requiredQualification = false
+      };
+      let requiredQualification = false;
       if (data.qualification_id) {
         whereQualificationCondition.id = data.qualification_id;
-        requiredQualification = true
+        requiredQualification = true;
       }
 
       let assessment_ = await Assessment.findAndCountAll({
@@ -602,6 +645,14 @@ class AssessmentService {
             },
           },
           {
+            model: Image,
+            as: "learner_image",
+            required: false,
+            where: {
+              entity_type: Entity.LEARNER_ASSESSMENT,
+            },
+          },
+          {
             model: User,
             as: "learners",
             required: learnerRequired,
@@ -617,8 +668,8 @@ class AssessmentService {
             model: Qualifications,
             as: "qualification",
             required: requiredQualification,
-            where: whereQualificationCondition
-          }
+            where: whereQualificationCondition,
+          },
         ],
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
@@ -673,6 +724,14 @@ class AssessmentService {
             required: false,
             where: {
               entity_type: Entity.ASSESSMENT,
+            },
+          },
+          {
+            model: Image,
+            as: "learner_image",
+            required: false,
+            where: {
+              entity_type: Entity.LEARNER_ASSESSMENT,
             },
           },
         ],
@@ -765,6 +824,64 @@ class AssessmentService {
     } catch (error) {
       console.error("Error deleting assessment:", error);
       await transaction.rollback();
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: "Server error",
+      };
+    }
+  }
+
+  // Update Assessment Status
+  static async updateAssessmentStatus(
+    data: any,
+    assessment_id: string,
+    userData: userAuthenticationData
+  ): Promise<any> {
+    try {
+      const assessment = await Assessment.findByPk(assessment_id);
+      if (!assessment) {
+        return {
+          status: STATUS_CODES.NOT_FOUND,
+          message: "Assessment not found",
+        };
+      }
+
+      const newStatus = data.status;
+      const currentStatus = assessment.status;
+
+      // Validation rules
+      if (
+        newStatus === AssessmentStatus.ASSESSOR_REJECT &&
+        currentStatus !== AssessmentStatus.LEARNER_AGREED
+      ) {
+        return {
+          status: STATUS_CODES.BAD_REQUEST,
+          message:
+            "Action not allowed: An assessment can only be rejected after the learner has agreed. Please check the current status and try again.",
+        };
+      }
+
+      if (
+        newStatus === AssessmentStatus.ASSESSMENT_COMPLETED &&
+        currentStatus !== AssessmentStatus.LEARNER_AGREED
+      ) {
+        return {
+          status: STATUS_CODES.BAD_REQUEST,
+          message:
+            "Action not allowed: Assessment completion is only possible after learner agreement. Ensure the learner has agreed before completing.",
+        };
+      }
+
+      // Update only if valid
+      assessment.status = newStatus;
+      await assessment.save();
+
+      return {
+        status: STATUS_CODES.SUCCESS,
+        message: "Assessment status updated successfully",
+      };
+    } catch (error) {
+      console.error("Error updating assessment status:", error);
       return {
         status: STATUS_CODES.SERVER_ERROR,
         message: "Server error",

@@ -174,6 +174,7 @@ export const Roles = {
 
 export const Entity = {
   ASSESSMENT: 'assessment',
+  LEARNER_ASSESSMENT: "leaner_assessment",
   LEARNER: 'learner',
   ASSESSOR: 'assessor',
   OBSERVER: 'observer',
@@ -187,4 +188,11 @@ export const EntityType = {
   DOCUMENT: 'document',
   AUDIO: 'audio',
   OTHER: 'other',
+}
+
+export const AssessmentStatus = {
+  ASSESSMENT_CREATE: 1,
+  LEARNER_AGREED: 2,
+  ASSESSOR_REJECT: 3,
+  ASSESSMENT_COMPLETED: 4
 }

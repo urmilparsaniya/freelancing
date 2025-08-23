@@ -88,7 +88,10 @@ export default (app: Application): void => {
   // Assessment Routes
   app.use(
     "/" + process.env.API_BASE_URL + "/v1/assessment",
-    upload.array("files"), // Use multer for multiple files
+    upload.fields([
+      { name: 'files' },
+      { name: 'learner_upload_files' }
+    ]),
     assessment
   );
 };
