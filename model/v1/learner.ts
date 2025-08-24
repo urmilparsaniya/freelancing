@@ -348,14 +348,17 @@ class LearnerService {
       let whereConditionInclude: any = {
         deletedAt: null,
       };
-      let includeRequired = false;
+      // let includeRequired = false;
+      let includeRequiredAssessor = false;
+      let includeRequiredIqa = false
 
       // Qualification Management
       if (data?.user_id) {
         whereConditionQualification.user_id = data.user_id;
         qualificationRequired = true;
         whereConditionInclude.id = data.user_id;
-        includeRequired = true;
+        includeRequiredAssessor = true;
+        includeRequiredIqa = true
       }
 
       // Check if logged in user is assessor then only assigned learner will show
@@ -364,7 +367,7 @@ class LearnerService {
       });
       if (isLearner) {
         whereConditionInclude.id = userData.id;
-        includeRequired = true;
+        includeRequiredAssessor = true;
       }
 
       let userData_ = await User.findAndCountAll({
@@ -382,14 +385,14 @@ class LearnerService {
             as: "assessors",
             through: { attributes: [] },
             where: whereConditionInclude,
-            required: includeRequired,
+            required: includeRequiredAssessor,
           },
           {
             model: User,
             as: "iqas",
             through: { attributes: [] },
             where: whereConditionInclude,
-            required: includeRequired,
+            required: includeRequiredIqa,
           },
           {
             model: Center,
