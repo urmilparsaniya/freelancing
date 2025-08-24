@@ -354,7 +354,7 @@ class LearnerService {
       if (data?.user_id) {
         whereConditionQualification.user_id = data.user_id;
         qualificationRequired = true;
-        whereConditionInclude.user_id = data.user_id;
+        whereConditionInclude.id = data.user_id;
         includeRequired = true;
       }
 
@@ -363,7 +363,7 @@ class LearnerService {
         where: { id: userData.id, role: Roles.ASSESSOR ,deletedAt: null },
       });
       if (isLearner) {
-        whereConditionInclude.user_id = userData.id;
+        whereConditionInclude.id = userData.id;
         includeRequired = true;
       }
 
