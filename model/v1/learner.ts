@@ -358,6 +358,15 @@ class LearnerService {
         includeRequired = true;
       }
 
+      // Check if logged in user is assessor then only assigned learner will show
+      let isLearner = await User.findOne({
+        where: { id: userData.id, role: Roles.ASSESSOR ,deletedAt: null },
+      });
+      if (isLearner) {
+        whereConditionInclude.user_id = userData.id;
+        includeRequired = true;
+      }
+
       let userData_ = await User.findAndCountAll({
         where: whereCondition,
         include: [
