@@ -32,6 +32,8 @@ import { extname } from "path";
 import AssessmentMethod from "../../database/schema/assessment_methods";
 import AssessmentUnits from "../../database/schema/assessment_units";
 import AssessmentLearner from "../../database/schema/assessment_learners";
+import AssessmentNotes from "../../database/schema/assessment_notes";
+import AssessmentNoteFiles from "../../database/schema/assessment_note_files";
 
 class AssessmentService {
   // Create Assessment
@@ -179,6 +181,7 @@ class AssessmentService {
         }
       }
 
+      const fileIds = [];
       if (files && files.length > 0) {
         for (const file of files) {
           try {
@@ -190,7 +193,7 @@ class AssessmentService {
             const fileName = file.originalname;
 
             // Create File
-            await Image.create(
+            const fileCreated = await Image.create(
               {
                 entity_type: Entity.ASSESSMENT,
                 entity_id: assessment.id, // Remove + operator as assessment.id is already a number
@@ -201,6 +204,7 @@ class AssessmentService {
               },
               { transaction }
             );
+            fileIds.push(fileCreated.id);
           } catch (fileError) {
             console.error("Error uploading file:", fileError);
             await transaction.rollback();
@@ -209,6 +213,63 @@ class AssessmentService {
               message: "Error uploading file",
             };
           }
+        }
+      }
+
+      // Handle assessment notes
+      /**
+       * Create main assessment note and if files are uploaded then create assessment note files
+       * we need to provide the response like this
+       * "questionnaires": [
+            {
+              "id": "Q001",
+              "uploadedBy": "assessor",
+              "files": [
+              {
+                "fileName": "questionnaire1.pdf link",
+                "fileType": "pdf",
+                "uploadedAt": "2025-08-27T10:15:00Z"
+              },
+              {
+                "fileName": "questionnaire2.docx",
+                "fileType": "docx",
+                "uploadedAt": "2025-08-27T10:16:00Z"
+              }
+            ],
+            "notes": "Please review both files carefully before uploading evidence."
+          }
+        ],
+       */
+      if (data.assessment_note) {
+        try {
+          const uploadedBy = userData_.role === Roles.ASSESSOR ? 1 : 5;
+          const assessmentNoteData = {
+            assessment_id: assessment.id,
+            user_id: userData_.id,
+            uploaded_by: uploadedBy,
+            feedback: data.assessment_note,
+            is_main_assessment_note: true,
+          };
+          let assessmentNote = await AssessmentNotes.create(
+            assessmentNoteData,
+            { transaction }
+          );
+          if (fileIds.length > 0 && assessmentNote) {
+            await AssessmentNoteFiles.bulkCreate(
+              fileIds.map((fid) => ({
+                assessment_note_id: assessmentNote.id,
+                file_id: fid,
+              })),
+              { transaction }
+            );
+          }
+        } catch (error) {
+          console.error("Error creating assessment note:", error);
+          await transaction.rollback();
+          return {
+            status: STATUS_CODES.SERVER_ERROR,
+            message: "Error creating assessment note",
+          };
         }
       }
 
@@ -440,6 +501,7 @@ class AssessmentService {
       }
 
       // Handle file uploads first
+      let fileIds = [];
       if (files && files.length > 0) {
         for (const file of files) {
           try {
@@ -451,7 +513,7 @@ class AssessmentService {
             const fileName = file.originalname;
 
             // Create File
-            await Image.create(
+            const fileCreated = await Image.create(
               {
                 entity_type: Entity.ASSESSMENT,
                 entity_id: assessment.id, // Remove + operator as assessment.id is already a number
@@ -462,6 +524,7 @@ class AssessmentService {
               },
               { transaction }
             );
+            fileIds.push(fileCreated.id);
           } catch (fileError) {
             console.error("Error uploading file:", fileError);
             await transaction.rollback();
@@ -474,6 +537,7 @@ class AssessmentService {
       }
 
       // Handle file upload of learner
+      let learnerFileIds = [];
       if (learnerFiles && learnerFiles.length > 0) {
         for (const learnerFile of learnerFiles) {
           try {
@@ -484,7 +548,7 @@ class AssessmentService {
             const fileSize = learnerFile.size;
             const fileName = learnerFile.originalname;
             // Create Learner File
-            await Image.create(
+            const fileCreated = await Image.create(
               {
                 entity_type: Entity.LEARNER_ASSESSMENT,
                 entity_id: assessment.id,
@@ -495,6 +559,7 @@ class AssessmentService {
               },
               { transaction }
             );
+            learnerFileIds.push(fileCreated.id);
           } catch (error) {
             console.log("Error uploading learner file:", error);
             await transaction.rollback();
@@ -549,6 +614,72 @@ class AssessmentService {
           return {
             status: STATUS_CODES.SERVER_ERROR,
             message: "Error deleting files",
+          };
+        }
+      }
+
+      // Handle assessment notes
+      if (data.assessment_note) {
+        try {
+          const assessmentNote = await AssessmentNotes.findAll({
+            where: { assessment_id: assessment.id },
+            order: [['cycle', 'DESC']]
+          });
+          // check if assessment note is main assessment note then update it
+          if (assessmentNote.length == 1 && assessmentNote[0].is_main_assessment_note && userData_.role == Roles.ASSESSOR) {
+            await assessmentNote[0].update({
+              feedback: data.assessment_note,
+            }, { transaction });
+          } else {
+            // Now we need to check if API call came from learner then we need to create new assessment note
+            if (userData_.role == Roles.LEARNER) {
+              let assessmentNoteData = {
+                assessment_id: assessment.id,
+                user_id: userData_.id,
+                uploaded_by: 2,
+                feedback: data.assessment_note,
+                is_main_assessment_note: false,
+                cycle: assessmentNote[0].cycle + 1 || 1,
+              };
+              let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
+              if (learnerFileIds.length > 0 && assessmentNote_) {
+                await AssessmentNoteFiles.bulkCreate(
+                  learnerFileIds.map((fid) => ({
+                    assessment_note_id: assessmentNote_.id,
+                    file_id: fid,
+                  })),
+                  { transaction }
+                );
+              }
+            }
+            // Now need to check if API call came from assessor then need to create new assessment note but cycle number is same 
+            if (userData_.role == Roles.ASSESSOR) {
+              let assessmentNoteData = {
+                assessment_id: assessment.id,
+                user_id: userData_.id,
+                uploaded_by: 1,
+                feedback: data.assessment_note,
+                is_main_assessment_note: false,
+                cycle: assessmentNote[0].cycle,
+              }
+              let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
+              if (fileIds.length > 0 && assessmentNote_) {
+                await AssessmentNoteFiles.bulkCreate(
+                  fileIds.map((fid) => ({
+                    assessment_note_id: assessmentNote_.id,
+                    file_id: fid,
+                  })),
+                  { transaction }
+                );
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error updating assessment note:", error);
+          await transaction.rollback();
+          return {
+            status: STATUS_CODES.SERVER_ERROR,
+            message: "Error updating assessment note",
           };
         }
       }
@@ -670,6 +801,38 @@ class AssessmentService {
             required: requiredQualification,
             where: whereQualificationCondition,
           },
+          {
+            model: AssessmentNotes,
+            as: "questionnaires",
+            required: false,
+            include: [
+              {
+                model: Image,
+                as: "files",
+                required: false,
+                through: { attributes: [] },
+              }
+            ],
+            where: {
+              is_main_assessment_note: true,
+            }
+          },
+          {
+            model: AssessmentNotes,
+            as: "evidence_cycles",
+            required: false,
+            include: [
+              {
+                model: Image,
+                as: "files",
+                required: false,
+                through: { attributes: [] },
+              }
+            ],
+            where: {
+              is_main_assessment_note: false,
+            }
+          }
         ],
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
@@ -678,6 +841,62 @@ class AssessmentService {
       });
 
       assessment_ = JSON.parse(JSON.stringify(assessment_));
+      
+      // Transform evidence cycles to group by cycle number for each assessment
+      if (assessment_.rows && assessment_.rows.length > 0) {
+        assessment_.rows.forEach((assessment: any) => {
+          if (assessment.evidence_cycles && assessment.evidence_cycles.length > 0) {
+            const cyclesMap = new Map();
+            
+            assessment.evidence_cycles.forEach((cycle: any) => {
+              const cycleNumber = cycle.cycle || 1;
+              
+              if (!cyclesMap.has(cycleNumber)) {
+                cyclesMap.set(cycleNumber, {
+                  cycle: cycleNumber,
+                  learnerEvidence: {
+                    files: [],
+                    notes: ""
+                  },
+                  assessorReview: {
+                    status: "",
+                    notes: "",
+                    additionalResources: []
+                  }
+                });
+              }
+              
+              const cycleData = cyclesMap.get(cycleNumber);
+              
+              // uploaded_by: 2 = learner, uploaded_by: 1 = assessor
+              if (cycle.uploaded_by === 2) {
+                // Learner evidence
+                cycleData.learnerEvidence.notes = cycle.feedback || "";
+                cycleData.learnerEvidence.files = cycle.files ? cycle.files.map((file: any) => ({
+                  fileName: file.image_name,
+                  fileType: file.image_type,
+                  uploadedAt: file.createdAt
+                })) : [];
+              } else if (cycle.uploaded_by === 1) {
+                // Assessor review
+                cycleData.assessorReview.notes = cycle.feedback || "";
+                cycleData.assessorReview.status = cycle.status || "";
+                cycleData.assessorReview.additionalResources = cycle.files ? cycle.files.map((file: any) => ({
+                  fileName: file.image_name,
+                  fileType: file.image_type,
+                  uploadedAt: file.createdAt
+                })) : [];
+              }
+            });
+            
+            // Convert map to array and sort by cycle number
+            assessment.evidenceCycles = Array.from(cyclesMap.values()).sort((a, b) => a.cycle - b.cycle);
+          } else {
+            assessment.evidenceCycles = [];
+          }
+        });
+      }
+      
       const pagination = await paginate(assessment_, limit, page, fetchAll);
       const response = {
         data: assessment_.rows,
@@ -704,7 +923,7 @@ class AssessmentService {
     userData: userAuthenticationData
   ): Promise<any> {
     try {
-      let assessment = await Assessment.findByPk(assessmentId, {
+      let assessment: any = await Assessment.findByPk(assessmentId, {
         include: [
           {
             model: Methods,
@@ -734,10 +953,114 @@ class AssessmentService {
               entity_type: Entity.LEARNER_ASSESSMENT,
             },
           },
+          {
+            model: AssessmentNotes,
+            as: "questionnaires",
+            required: false,
+            include: [
+              {
+                model: Image,
+                as: "files",
+                required: false,
+                through: { attributes: [] },
+              }
+            ],
+            where: {
+              is_main_assessment_note: true,
+            }
+          },
+          {
+            model: AssessmentNotes,
+            as: "evidence_cycles",
+            required: false,
+            include: [
+              {
+                model: Image,
+                as: "files",
+                required: false,
+                through: { attributes: [] },
+              }
+            ],
+            where: {
+              is_main_assessment_note: false,
+            }
+          }
         ],
       });
 
       assessment = JSON.parse(JSON.stringify(assessment));
+
+      let learner_comment = false
+      let assessor_comment = false
+
+      if (assessment.assessment_status == AssessmentStatus.ASSESSMENT_CREATE) {
+        learner_comment = true
+        assessor_comment = true
+      } else if (assessment.assessment_status == AssessmentStatus.LEARNER_AGREED) {
+        learner_comment = false
+        assessor_comment = true
+      } else if (assessment.assessment_status == AssessmentStatus.ASSESSMENT_COMPLETED) {
+        learner_comment = false
+        assessor_comment = false
+      } else if (assessment.assessment_status == AssessmentStatus.ASSESSOR_REJECT) {
+        learner_comment = true
+        assessor_comment = false
+      }
+
+      assessment.learner_comment = learner_comment
+      assessment.assessor_comment = assessor_comment
+
+      // Transform evidence cycles to group by cycle number
+      const assessmentData = assessment as any;
+      if (assessmentData.evidence_cycles && assessmentData.evidence_cycles.length > 0) {
+        const cyclesMap = new Map();
+        
+        assessmentData.evidence_cycles.forEach((cycle: any) => {
+          const cycleNumber = cycle.cycle || 1;
+          
+          if (!cyclesMap.has(cycleNumber)) {
+            cyclesMap.set(cycleNumber, {
+              cycle: cycleNumber,
+              learnerEvidence: {
+                files: [],
+                notes: ""
+              },
+              assessorReview: {
+                status: "",
+                notes: "",
+                additionalResources: []
+              }
+            });
+          }
+          
+          const cycleData = cyclesMap.get(cycleNumber);
+          
+          // uploaded_by: 2 = learner, uploaded_by: 1 = assessor
+          if (cycle.uploaded_by === 2) {
+            // Learner evidence
+            cycleData.learnerEvidence.notes = cycle.feedback || "";
+            cycleData.learnerEvidence.files = cycle.files ? cycle.files.map((file: any) => ({
+              fileName: file.image_name,
+              fileType: file.image_type,
+              uploadedAt: file.createdAt
+            })) : [];
+          } else if (cycle.uploaded_by === 1) {
+            // Assessor review
+            cycleData.assessorReview.notes = cycle.feedback || "";
+            cycleData.assessorReview.status = cycle.status || "";
+            cycleData.assessorReview.additionalResources = cycle.files ? cycle.files.map((file: any) => ({
+              fileName: file.image_name,
+              fileType: file.image_type,
+              uploadedAt: file.createdAt
+            })) : [];
+          }
+        });
+        
+        // Convert map to array and sort by cycle number
+        assessmentData.evidenceCycles = Array.from(cyclesMap.values()).sort((a, b) => a.cycle - b.cycle);
+      } else {
+        assessmentData.evidenceCycles = [];
+      }
 
       return {
         status: STATUS_CODES.SUCCESS,
@@ -837,6 +1160,7 @@ class AssessmentService {
     assessment_id: string,
     userData: userAuthenticationData
   ): Promise<any> {
+    const transaction = await sequelize.transaction();
     try {
       const assessment = await Assessment.findByPk(assessment_id);
       if (!assessment) {
@@ -875,7 +1199,74 @@ class AssessmentService {
       // Update only if valid
       assessment.assessment_status = newStatus;
       assessment.feedback = data.feedback
-      await assessment.save();
+      await assessment.save({ transaction });
+
+      // if (data.assessment_note) {
+      //   try {
+      //     const assessmentNote = await AssessmentNotes.findAll({
+      //       where: { assessment_id: assessment.id },
+      //       order: [['cycle', 'DESC']]
+      //     });
+      //     // check if assessment note is main assessment note then update it
+      //     if (assessmentNote.length == 1 && assessmentNote[0].is_main_assessment_note && userData_.role == Roles.ASSESSOR) {
+      //       await assessmentNote[0].update({
+      //         feedback: data.assessment_note,
+      //       }, { transaction });
+      //     } else {
+      //       // Now we need to check if API call came from learner then we need to create new assessment note
+      //       if (userData_.role == Roles.LEARNER) {
+      //         let assessmentNoteData = {
+      //           assessment_id: assessment.id,
+      //           user_id: userData_.id,
+      //           uploaded_by: 2,
+      //           feedback: data.assessment_note,
+      //           is_main_assessment_note: false,
+      //           cycle: assessmentNote[0].cycle + 1 || 1,
+      //         };
+      //         let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
+      //         if (learnerFileIds.length > 0 && assessmentNote_) {
+      //           await AssessmentNoteFiles.bulkCreate(
+      //             learnerFileIds.map((fid) => ({
+      //               assessment_note_id: assessmentNote_.id,
+      //               file_id: fid,
+      //             })),
+      //             { transaction }
+      //           );
+      //         }
+      //       }
+      //       // Now need to check if API call came from assessor then need to create new assessment note but cycle number is same 
+      //       if (userData_.role == Roles.ASSESSOR) {
+      //         let assessmentNoteData = {
+      //           assessment_id: assessment.id,
+      //           user_id: userData_.id,
+      //           uploaded_by: 1,
+      //           feedback: data.assessment_note,
+      //           is_main_assessment_note: false,
+      //           cycle: assessmentNote[0].cycle,
+      //         }
+      //         let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
+      //         if (fileIds.length > 0 && assessmentNote_) {
+      //           await AssessmentNoteFiles.bulkCreate(
+      //             fileIds.map((fid) => ({
+      //               assessment_note_id: assessmentNote_.id,
+      //               file_id: fid,
+      //             })),
+      //             { transaction }
+      //           );
+      //         }
+      //       }
+      //     }
+      //   } catch (error) {
+      //     console.error("Error updating assessment note:", error);
+      //     await transaction.rollback();
+      //     return {
+      //       status: STATUS_CODES.SERVER_ERROR,
+      //       message: "Error updating assessment note",
+      //     };
+      //   }
+      // }
+
+      await transaction.commit();
 
       return {
         status: STATUS_CODES.SUCCESS,
@@ -883,6 +1274,7 @@ class AssessmentService {
       };
     } catch (error) {
       console.error("Error updating assessment status:", error);
+      await transaction.rollback();
       return {
         status: STATUS_CODES.SERVER_ERROR,
         message: "Server error",

@@ -16,5 +16,7 @@ export const TABLE_NAME = {
   IMAGE: "tbl_image",
   ASSESSMENT_METHODS: "tbl_assessment_methods",
   ASSESSMENT_UNITS: "tbl_assessment_units",
-  ASSESSMENT_LEARNER: "tbl_assessment_learner"
+  ASSESSMENT_LEARNER: "tbl_assessment_learner",
+  ASSESSMENT_NOTES: "tbl_assessment_notes",
+  ASSESSMENT_NOTE_FILES: "tbl_assessment_note_files",
 };

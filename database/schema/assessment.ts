@@ -11,6 +11,8 @@ import { Entity } from "../../configs/constants";
 import AssessmentLearner from "./assessment_learners";
 import User from "./user";
 import Qualifications from "./qualifications";
+import AssessmentNotes from "./assessment_notes";
+import AssessmentNoteFiles from "./assessment_note_files";
 
 class Assessment
   extends Model<AssessmentInterface>
@@ -132,6 +134,18 @@ Assessment.hasOne(Qualifications, {
   foreignKey: "id",
   sourceKey: "qualification_id",
   as: "qualification"
+})
+
+Assessment.hasOne(AssessmentNotes, {
+  foreignKey: "assessment_id",
+  sourceKey: "id",
+  as: "questionnaires",
+})
+
+Assessment.hasMany(AssessmentNotes, {
+  foreignKey: "assessment_id",
+  sourceKey: "id",
+  as: "evidence_cycles",
 })
 
 export default Assessment;
