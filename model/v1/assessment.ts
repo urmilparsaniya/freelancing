@@ -4,7 +4,9 @@ import {
   AssessmentStatus,
   Entity,
   EntityType,
+  RoleRoleSlug,
   Roles,
+  RoleSlug,
   STATUS_CODES,
   STATUS_MESSAGE,
 } from "../../configs/constants";
@@ -242,7 +244,7 @@ class AssessmentService {
        */
       if (data.assessment_note) {
         try {
-          const uploadedBy = userData_.role === Roles.ASSESSOR ? 1 : 5;
+          const uploadedBy = RoleRoleSlug[userData.role]
           const assessmentNoteData = {
             assessment_id: assessment.id,
             user_id: userData_.id,
@@ -636,7 +638,7 @@ class AssessmentService {
               let assessmentNoteData = {
                 assessment_id: assessment.id,
                 user_id: userData_.id,
-                uploaded_by: 2,
+                uploaded_by: RoleSlug.LEARNER,
                 feedback: data.assessment_note,
                 is_main_assessment_note: false,
                 cycle: assessmentNote[0].cycle + 1 || 1,
@@ -657,7 +659,7 @@ class AssessmentService {
               let assessmentNoteData = {
                 assessment_id: assessment.id,
                 user_id: userData_.id,
-                uploaded_by: 1,
+                uploaded_by: RoleSlug.LEARNER,
                 feedback: data.assessment_note,
                 is_main_assessment_note: false,
                 cycle: assessmentNote[0].cycle,
@@ -754,86 +756,73 @@ class AssessmentService {
 
       let assessment_ = await Assessment.findAndCountAll({
         where: whereCondition,
-        include: [
-          {
-            model: Methods,
-            as: "methods",
-            required: false,
-            through: { attributes: [] }, // prevent including join table info
-          },
-          {
-            model: Units,
-            as: "units",
-            required: false,
-            through: { attributes: [] }, // prevent including join table info
-          },
-          {
-            model: Image,
-            as: "images",
-            required: false,
-            where: {
-              entity_type: Entity.ASSESSMENT,
-            },
-          },
-          {
-            model: Image,
-            as: "learner_image",
-            required: false,
-            where: {
-              entity_type: Entity.LEARNER_ASSESSMENT,
-            },
-          },
-          {
-            model: User,
-            as: "learners",
-            required: learnerRequired,
-            where: learnerWhereCondition,
-            through: { attributes: [] },
-          },
-          {
-            model: User,
-            as: "assessor",
-            required: false,
-          },
-          {
-            model: Qualifications,
-            as: "qualification",
-            required: requiredQualification,
-            where: whereQualificationCondition,
-          },
-          {
-            model: AssessmentNotes,
-            as: "questionnaires",
-            required: false,
-            include: [
-              {
-                model: Image,
-                as: "files",
-                required: false,
-                through: { attributes: [] },
-              }
-            ],
-            where: {
-              is_main_assessment_note: true,
-            }
-          },
-          {
-            model: AssessmentNotes,
-            as: "evidence_cycles",
-            required: false,
-            include: [
-              {
-                model: Image,
-                as: "files",
-                required: false,
-                through: { attributes: [] },
-              }
-            ],
-            where: {
-              is_main_assessment_note: false,
-            }
-          }
-        ],
+        // include: [
+        //   {
+        //     model: Methods,
+        //     as: "methods",
+        //     required: false,
+        //     through: { attributes: [] }, // prevent including join table info
+        //   },
+        //   {
+        //     model: Units,
+        //     as: "units",
+        //     required: false,
+        //     through: { attributes: [] }, // prevent including join table info
+        //   },
+        //   {
+        //     model: Image,
+        //     as: "images",
+        //     required: false,
+        //     where: {
+        //       entity_type: Entity.ASSESSMENT,
+        //     },
+        //   },
+        //   {
+        //     model: Image,
+        //     as: "learner_image",
+        //     required: false,
+        //     where: {
+        //       entity_type: Entity.LEARNER_ASSESSMENT,
+        //     },
+        //   },
+        //   {
+        //     model: User,
+        //     as: "learners",
+        //     required: learnerRequired,
+        //     where: learnerWhereCondition,
+        //     through: { attributes: [] },
+        //   },
+        //   {
+        //     model: User,
+        //     as: "assessor",
+        //     required: false,
+        //   },
+        //   {
+        //     model: Qualifications,
+        //     as: "qualification",
+        //     required: requiredQualification,
+        //     where: whereQualificationCondition,
+        //   },
+        //   {
+        //     model: AssessmentNotes,
+        //     as: "evidence_cycles",
+        //     required: false,
+        //     include: [
+        //       {
+        //         model: Image,
+        //         as: "files",
+        //         required: false,
+        //         through: { attributes: [] },
+        //       },
+        //       {
+        //         model: User,
+        //         as: "user",
+        //         required: false,
+        //         attributes: ["id", "name", "surname"],
+        //       }
+        //     ],
+        //   }
+        // ],
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
         order,
@@ -841,61 +830,6 @@ class AssessmentService {
       });
 
       assessment_ = JSON.parse(JSON.stringify(assessment_));
-      
-      // Transform evidence cycles to group by cycle number for each assessment
-      if (assessment_.rows && assessment_.rows.length > 0) {
-        assessment_.rows.forEach((assessment: any) => {
-          if (assessment.evidence_cycles && assessment.evidence_cycles.length > 0) {
-            const cyclesMap = new Map();
-            
-            assessment.evidence_cycles.forEach((cycle: any) => {
-              const cycleNumber = cycle.cycle || 1;
-              
-              if (!cyclesMap.has(cycleNumber)) {
-                cyclesMap.set(cycleNumber, {
-                  cycle: cycleNumber,
-                  learnerEvidence: {
-                    files: [],
-                    notes: ""
-                  },
-                  assessorReview: {
-                    status: "",
-                    notes: "",
-                    additionalResources: []
-                  }
-                });
-              }
-              
-              const cycleData = cyclesMap.get(cycleNumber);
-              
-              // uploaded_by: 2 = learner, uploaded_by: 1 = assessor
-              if (cycle.uploaded_by === 2) {
-                // Learner evidence
-                cycleData.learnerEvidence.notes = cycle.feedback || "";
-                cycleData.learnerEvidence.files = cycle.files ? cycle.files.map((file: any) => ({
-                  fileName: file.image_name,
-                  fileType: file.image_type,
-                  uploadedAt: file.createdAt
-                })) : [];
-              } else if (cycle.uploaded_by === 1) {
-                // Assessor review
-                cycleData.assessorReview.notes = cycle.feedback || "";
-                cycleData.assessorReview.status = cycle.status || "";
-                cycleData.assessorReview.additionalResources = cycle.files ? cycle.files.map((file: any) => ({
-                  fileName: file.image_name,
-                  fileType: file.image_type,
-                  uploadedAt: file.createdAt
-                })) : [];
-              }
-            });
-            
-            // Convert map to array and sort by cycle number
-            assessment.evidenceCycles = Array.from(cyclesMap.values()).sort((a, b) => a.cycle - b.cycle);
-          } else {
-            assessment.evidenceCycles = [];
-          }
-        });
-      }
       
       const pagination = await paginate(assessment_, limit, page, fetchAll);
       const response = {
@@ -955,22 +889,6 @@ class AssessmentService {
           },
           {
             model: AssessmentNotes,
-            as: "questionnaires",
-            required: false,
-            include: [
-              {
-                model: Image,
-                as: "files",
-                required: false,
-                through: { attributes: [] },
-              }
-            ],
-            where: {
-              is_main_assessment_note: true,
-            }
-          },
-          {
-            model: AssessmentNotes,
             as: "evidence_cycles",
             required: false,
             include: [
@@ -979,13 +897,19 @@ class AssessmentService {
                 as: "files",
                 required: false,
                 through: { attributes: [] },
+              },
+              {
+                model: User,
+                as: "user",
+                required: false,
+                attributes: ["id", "name", "surname"],
               }
             ],
-            where: {
-              is_main_assessment_note: false,
-            }
           }
         ],
+        order: [
+          [{ model: AssessmentNotes, as: "evidence_cycles" }, "id", "DESC"]
+        ]
       });
 
       assessment = JSON.parse(JSON.stringify(assessment));
@@ -993,73 +917,22 @@ class AssessmentService {
       let learner_comment = false
       let assessor_comment = false
 
-      if (assessment.assessment_status == AssessmentStatus.ASSESSMENT_CREATE) {
-        learner_comment = true
-        assessor_comment = true
-      } else if (assessment.assessment_status == AssessmentStatus.LEARNER_AGREED) {
-        learner_comment = false
-        assessor_comment = true
-      } else if (assessment.assessment_status == AssessmentStatus.ASSESSMENT_COMPLETED) {
-        learner_comment = false
-        assessor_comment = false
-      } else if (assessment.assessment_status == AssessmentStatus.ASSESSOR_REJECT) {
-        learner_comment = true
-        assessor_comment = false
-      }
-
-      assessment.learner_comment = learner_comment
-      assessment.assessor_comment = assessor_comment
-
-      // Transform evidence cycles to group by cycle number
-      const assessmentData = assessment as any;
-      if (assessmentData.evidence_cycles && assessmentData.evidence_cycles.length > 0) {
-        const cyclesMap = new Map();
-        
-        assessmentData.evidence_cycles.forEach((cycle: any) => {
-          const cycleNumber = cycle.cycle || 1;
-          
-          if (!cyclesMap.has(cycleNumber)) {
-            cyclesMap.set(cycleNumber, {
-              cycle: cycleNumber,
-              learnerEvidence: {
-                files: [],
-                notes: ""
-              },
-              assessorReview: {
-                status: "",
-                notes: "",
-                additionalResources: []
-              }
-            });
-          }
-          
-          const cycleData = cyclesMap.get(cycleNumber);
-          
-          // uploaded_by: 2 = learner, uploaded_by: 1 = assessor
-          if (cycle.uploaded_by === 2) {
-            // Learner evidence
-            cycleData.learnerEvidence.notes = cycle.feedback || "";
-            cycleData.learnerEvidence.files = cycle.files ? cycle.files.map((file: any) => ({
-              fileName: file.image_name,
-              fileType: file.image_type,
-              uploadedAt: file.createdAt
-            })) : [];
-          } else if (cycle.uploaded_by === 1) {
-            // Assessor review
-            cycleData.assessorReview.notes = cycle.feedback || "";
-            cycleData.assessorReview.status = cycle.status || "";
-            cycleData.assessorReview.additionalResources = cycle.files ? cycle.files.map((file: any) => ({
-              fileName: file.image_name,
-              fileType: file.image_type,
-              uploadedAt: file.createdAt
-            })) : [];
-          }
-        });
-        
-        // Convert map to array and sort by cycle number
-        assessmentData.evidenceCycles = Array.from(cyclesMap.values()).sort((a, b) => a.cycle - b.cycle);
-      } else {
-        assessmentData.evidenceCycles = [];
+      if (assessment) {
+        if (assessment.assessment_status == AssessmentStatus.ASSESSMENT_CREATE) {
+          learner_comment = true
+          assessor_comment = true
+        } else if (assessment.assessment_status == AssessmentStatus.LEARNER_AGREED) {
+          learner_comment = false
+          assessor_comment = true
+        } else if (assessment.assessment_status == AssessmentStatus.ASSESSMENT_COMPLETED) {
+          learner_comment = false
+          assessor_comment = false
+        } else if (assessment.assessment_status == AssessmentStatus.ASSESSOR_REJECT) {
+          learner_comment = true
+          assessor_comment = false
+        }
+        assessment.learner_comment = learner_comment
+        assessment.assessor_comment = assessor_comment
       }
 
       return {

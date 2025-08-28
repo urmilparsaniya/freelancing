@@ -20,7 +20,7 @@ class AssessmentNotes
   public id!: number;
   public assessment_id!: number;
   public user_id!: number;
-  public uploaded_by!: number;
+  public uploaded_by!: string;
   public feedback!: string;
   public is_main_assessment_note!: boolean;
   public cycle!: number;
@@ -42,9 +42,9 @@ AssessmentNotes.init(
       allowNull: true,
     },
     uploaded_by: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING,
       allowNull: true,
-      comment: "1=assessor, 2=learner, 3=eqa, 4=iqa, 5=admin, 6=supre admmin",
+      comment: "Role Slug",
     },
     feedback: {
       type: DataTypes.TEXT('long'),
@@ -76,6 +76,12 @@ AssessmentNotes.belongsToMany(Image, {
   foreignKey: "assessment_note_id",
   otherKey: "file_id",
   as: "files",
+})
+
+AssessmentNotes.hasOne(User, {
+  foreignKey: "id",
+  sourceKey: "user_id",
+  as: "user",
 })
 
 export default AssessmentNotes;

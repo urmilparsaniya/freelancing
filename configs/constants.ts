@@ -172,6 +172,16 @@ export const Roles = {
   ADMIN: 7,
 }
 
+export const RoleRoleSlug = {
+  1: "super-admin",
+  2: "assessor",
+  3: "learner",
+  4: "observer",
+  5: "iqa",
+  6: "eqa",
+  7: "admin",
+}
+
 export const Entity = {
   ASSESSMENT: 'assessment',
   LEARNER_ASSESSMENT: "leaner_assessment",
@@ -195,4 +205,14 @@ export const AssessmentStatus = {
   LEARNER_AGREED: 2,
   ASSESSOR_REJECT: 3,
   ASSESSMENT_COMPLETED: 4
+}
+
+export const RoleSlug = {
+  SUPER_ADMIN: "super-admin",
+  ASSESSOR: "assessor",
+  LEARNER: "learner",
+  OBSERVER: "observer",
+  IQA: "iqa",
+  EQA: "eqa",
+  ADMIN: "admin",
 }
