@@ -756,73 +756,73 @@ class AssessmentService {
 
       let assessment_ = await Assessment.findAndCountAll({
         where: whereCondition,
-        // include: [
-        //   {
-        //     model: Methods,
-        //     as: "methods",
-        //     required: false,
-        //     through: { attributes: [] }, // prevent including join table info
-        //   },
-        //   {
-        //     model: Units,
-        //     as: "units",
-        //     required: false,
-        //     through: { attributes: [] }, // prevent including join table info
-        //   },
-        //   {
-        //     model: Image,
-        //     as: "images",
-        //     required: false,
-        //     where: {
-        //       entity_type: Entity.ASSESSMENT,
-        //     },
-        //   },
-        //   {
-        //     model: Image,
-        //     as: "learner_image",
-        //     required: false,
-        //     where: {
-        //       entity_type: Entity.LEARNER_ASSESSMENT,
-        //     },
-        //   },
-        //   {
-        //     model: User,
-        //     as: "learners",
-        //     required: learnerRequired,
-        //     where: learnerWhereCondition,
-        //     through: { attributes: [] },
-        //   },
-        //   {
-        //     model: User,
-        //     as: "assessor",
-        //     required: false,
-        //   },
-        //   {
-        //     model: Qualifications,
-        //     as: "qualification",
-        //     required: requiredQualification,
-        //     where: whereQualificationCondition,
-        //   },
-        //   {
-        //     model: AssessmentNotes,
-        //     as: "evidence_cycles",
-        //     required: false,
-        //     include: [
-        //       {
-        //         model: Image,
-        //         as: "files",
-        //         required: false,
-        //         through: { attributes: [] },
-        //       },
-        //       {
-        //         model: User,
-        //         as: "user",
-        //         required: false,
-        //         attributes: ["id", "name", "surname"],
-        //       }
-        //     ],
-        //   }
-        // ],
+        include: [
+          // {
+          //   model: Methods,
+          //   as: "methods",
+          //   required: false,
+          //   through: { attributes: [] }, // prevent including join table info
+          // },
+          // {
+          //   model: Units,
+          //   as: "units",
+          //   required: false,
+          //   through: { attributes: [] }, // prevent including join table info
+          // },
+          // {
+          //   model: Image,
+          //   as: "images",
+          //   required: false,
+          //   where: {
+          //     entity_type: Entity.ASSESSMENT,
+          //   },
+          // },
+          // {
+          //   model: Image,
+          //   as: "learner_image",
+          //   required: false,
+          //   where: {
+          //     entity_type: Entity.LEARNER_ASSESSMENT,
+          //   },
+          // },
+          {
+            model: User,
+            as: "learners",
+            required: learnerRequired,
+            where: learnerWhereCondition,
+            through: { attributes: [] },
+          },
+          // {
+          //   model: User,
+          //   as: "assessor",
+          //   required: false,
+          // },
+          {
+            model: Qualifications,
+            as: "qualification",
+            required: requiredQualification,
+            where: whereQualificationCondition,
+          },
+          // {
+          //   model: AssessmentNotes,
+          //   as: "evidence_cycles",
+          //   required: false,
+          //   include: [
+          //     {
+          //       model: Image,
+          //       as: "files",
+          //       required: false,
+          //       through: { attributes: [] },
+          //     },
+          //     {
+          //       model: User,
+          //       as: "user",
+          //       required: false,
+          //       attributes: ["id", "name", "surname"],
+          //     }
+          //   ],
+          // }
+        ],
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
         order,
