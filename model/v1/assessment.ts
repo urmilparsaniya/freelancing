@@ -1136,8 +1136,32 @@ class AssessmentService {
         transaction,
       });
 
+      // Delete Assessment Notes 
+      let assessmentNotes = await AssessmentNotes.findAll({
+        where: { assessment_id: assessment.id },
+        attributes: ["id"]
+      })
+      let assessmentNoteIds = assessmentNotes.map(
+        (assessmentIds) => assessmentIds.id
+      );
+      // Delete Assessment Notes Files first
+      if (assessmentNoteIds.length > 0) {
+        await AssessmentNoteFiles.destroy({
+          where: { assessment_note_id: { [Op.in]: assessmentNoteIds } },
+          transaction,
+          force: true
+        });
+      }
+
+      // Then delete Assessment Notes
+      await AssessmentNotes.destroy({
+        where: { assessment_id: assessment.id },
+        force: true,
+        transaction,
+      });
+
       // Soft delete the assessment
-      await assessment.destroy({ transaction });
+      await assessment.destroy({ force: true, transaction });
 
       await transaction.commit();
       return {
