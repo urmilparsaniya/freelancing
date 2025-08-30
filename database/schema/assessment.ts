@@ -74,7 +74,7 @@ Assessment.init(
       type: DataTypes.INTEGER,
       allowNull: true,
       defaultValue: 1,
-      comment: "1: create | 2: learner agreed | 3: assessor reject | 4: completed"
+      comment: "1: create | 2: learner agreed | 3: assessor reject | 4: completed | 5: not agreed by IQA | 6: agreed by IQA"
     },
     feedback: {
       type: DataTypes.TEXT,

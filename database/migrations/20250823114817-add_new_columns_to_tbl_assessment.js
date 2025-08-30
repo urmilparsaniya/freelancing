@@ -13,7 +13,7 @@ module.exports = {
       type: Sequelize.INTEGER,
       allowNull: true,
       comment:
-        "1: create | 2: learner agreed | 3: assessor reject | 4: completed",
+        "1: create | 2: learner agreed | 3: assessor reject | 4: completed | 5: not agreed by IQA | 6: agreed by IQA",
       defaultValue: 1
     });
     await queryInterface.addColumn("tbl_assessment", "feedback", {

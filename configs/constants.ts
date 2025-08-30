@@ -204,7 +204,9 @@ export const AssessmentStatus = {
   ASSESSMENT_CREATE: 1,
   LEARNER_AGREED: 2,
   ASSESSOR_REJECT: 3,
-  ASSESSMENT_COMPLETED: 4
+  ASSESSMENT_COMPLETED: 4,
+  NOT_AGREED_BY_IQA: 5,
+  AGREED_BY_IQA: 6
 }
 
 export const RoleSlug = {

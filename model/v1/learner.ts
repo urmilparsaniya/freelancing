@@ -361,11 +361,16 @@ class LearnerService {
         includeRequiredIqa = true
       }
 
+      if (data.iqa_id) {
+        whereConditionInclude.id = data.iqa_id;
+        includeRequiredIqa = true;
+      }
+
       // Check if logged in user is assessor then only assigned learner will show
-      let isLearner = await User.findOne({
+      let isAssessor = await User.findOne({
         where: { id: userData.id, role: Roles.ASSESSOR ,deletedAt: null },
       });
-      if (isLearner) {
+      if (isAssessor) {
         whereConditionInclude.id = userData.id;
         includeRequiredAssessor = true;
       }

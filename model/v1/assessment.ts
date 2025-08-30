@@ -675,6 +675,26 @@ class AssessmentService {
                 );
               }
             }
+            if (userData_.role == Roles.IQA) {
+              let assessmentNoteData = {
+                assessment_id: assessment.id,
+                user_id: userData_.id,
+                uploaded_by: RoleSlug.IQA,
+                feedback: data.assessment_note,
+                is_main_assessment_note: false,
+                cycle: assessmentNote[0].cycle,
+              }
+              let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
+              if (fileIds.length > 0 && assessmentNote_) {
+                await AssessmentNoteFiles.bulkCreate(
+                  fileIds.map((fid) => ({
+                    assessment_note_id: assessmentNote_.id,
+                    file_id: fid,
+                  })),
+                  { transaction }
+                );
+              }
+            }
           }
         } catch (error) {
           console.error("Error updating assessment note:", error);
@@ -720,6 +740,14 @@ class AssessmentService {
       let whereCondition: any = {
         deletedAt: null,
       };
+      
+      // Check login user is IQA
+      let isIqa = await User.findOne({
+        where: { id: userData.id, role: Roles.IQA },
+      });
+      if (isIqa) {
+        whereCondition.assessment_status = AssessmentStatus.ASSESSMENT_COMPLETED;
+      }
 
       let learnerWhereCondition: any = {
         deletedAt: null,
