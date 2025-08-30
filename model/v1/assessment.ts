@@ -659,7 +659,7 @@ class AssessmentService {
               let assessmentNoteData = {
                 assessment_id: assessment.id,
                 user_id: userData_.id,
-                uploaded_by: RoleSlug.LEARNER,
+                uploaded_by: RoleSlug.ASSESSOR,
                 feedback: data.assessment_note,
                 is_main_assessment_note: false,
                 cycle: assessmentNote[0].cycle,
