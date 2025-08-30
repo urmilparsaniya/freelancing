@@ -19,4 +19,5 @@ export const TABLE_NAME = {
   ASSESSMENT_LEARNER: "tbl_assessment_learner",
   ASSESSMENT_NOTES: "tbl_assessment_notes",
   ASSESSMENT_NOTE_FILES: "tbl_assessment_note_files",
+  REQUEST_QUALIFICATION: "tbl_request_qualification"
 };
