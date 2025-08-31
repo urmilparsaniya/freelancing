@@ -746,7 +746,9 @@ class AssessmentService {
         where: { id: userData.id, role: Roles.IQA },
       });
       if (isIqa) {
-        whereCondition.assessment_status = AssessmentStatus.ASSESSMENT_COMPLETED;
+        whereCondition.assessment_status = {
+          [Op.in]: [AssessmentStatus.NOT_AGREED_BY_IQA, AssessmentStatus.AGREED_BY_IQA, AssessmentStatus.ASSESSMENT_COMPLETED]
+        }
       }
 
       let learnerWhereCondition: any = {
