@@ -67,14 +67,14 @@ class RequestQualificationService {
       let isCenterAdmin = await User.findOne({
         where: {
           id: userData.id,
-          role: Roles.ADMIN,
+          role: { [Op.in]: [Roles.ADMIN, Roles.SUPER_ADMIN] },
         },
       });
       if (!isCenterAdmin) {
         await transaction.rollback();
         return {
           status: STATUS_CODES.UNAUTHORIZED,
-          message: "Only Center Admin can request the Qualification.",
+          message: "Only Center Admin and Super Admin can update request Qualification.",
         };
       }
       let requestQualification = await RequestQualification.findOne({
@@ -120,14 +120,14 @@ class RequestQualificationService {
       let isCenterAdmin = await User.findOne({
         where: {
           id: userData.id,
-          role: Roles.ADMIN,
+          role: { [Op.in]: [Roles.ADMIN, Roles.SUPER_ADMIN] },
         },
       });
       if (!isCenterAdmin) {
         await transaction.rollback();
         return {
           status: STATUS_CODES.UNAUTHORIZED,
-          message: "Only Center Admin can delete the Request Qualification.",
+          message: "Only Center Admin or Super Admin can delete the Request Qualification.",
         };
       }
       let requestQualification = await RequestQualification.findOne({
