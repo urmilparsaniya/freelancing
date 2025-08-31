@@ -251,6 +251,7 @@ class AssessmentService {
             uploaded_by: uploadedBy,
             feedback: data.assessment_note,
             is_main_assessment_note: true,
+            status: AssessmentStatus.ASSESSMENT_CREATE
           };
           let assessmentNote = await AssessmentNotes.create(
             assessmentNoteData,
@@ -642,6 +643,7 @@ class AssessmentService {
                 feedback: data.assessment_note,
                 is_main_assessment_note: false,
                 cycle: assessmentNote[0].cycle + 1 || 1,
+                status: data.assessment_status || AssessmentStatus.LEARNER_AGREED
               };
               let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
               if (learnerFileIds.length > 0 && assessmentNote_) {
@@ -663,6 +665,7 @@ class AssessmentService {
                 feedback: data.assessment_note,
                 is_main_assessment_note: false,
                 cycle: assessmentNote[0].cycle,
+                status: data.assessment_status
               }
               let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
               if (fileIds.length > 0 && assessmentNote_) {
@@ -683,6 +686,7 @@ class AssessmentService {
                 feedback: data.assessment_note,
                 is_main_assessment_note: false,
                 cycle: assessmentNote[0].cycle,
+                status: data.assessment_status
               }
               let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
               if (fileIds.length > 0 && assessmentNote_) {
