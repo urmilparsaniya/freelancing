@@ -53,7 +53,7 @@ class AssessmentService {
       let userData_ = await User.findOne({
         where: {
           id: userData.id,
-          role: { [Op.in]: [Roles.ADMIN, Roles.ASSESSOR] },
+          role: { [Op.in]: [Roles.ADMIN, Roles.ASSESSOR, Roles.IQA] },
         },
       });
       if (!userData_) {
@@ -61,7 +61,7 @@ class AssessmentService {
         return {
           status: STATUS_CODES.FORBIDDEN,
           message:
-            "Only Admins and Assessors are allowed to create assessments.",
+            "Only Admins, Assessors and IQA are allowed to create assessments.",
         };
       }
       data.assessor_id = userData_.id;
@@ -329,7 +329,7 @@ class AssessmentService {
       let userData_ = await User.findOne({
         where: {
           id: userData.id,
-          role: { [Op.in]: [Roles.ADMIN, Roles.ASSESSOR, Roles.LEARNER] },
+          role: { [Op.in]: [Roles.ADMIN, Roles.ASSESSOR, Roles.LEARNER, Roles.IQA, Roles.EQA] },
         },
       });
       if (!userData_) {
@@ -337,7 +337,7 @@ class AssessmentService {
         return {
           status: STATUS_CODES.FORBIDDEN,
           message:
-            "Only Admins and Assessors are allowed to update assessments.",
+            "Only Admins, Assessors and IQA are allowed to update assessments.",
         };
       }
       let assessment = await Assessment.findByPk(assessmentId);
