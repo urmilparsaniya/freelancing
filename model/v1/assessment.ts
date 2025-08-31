@@ -736,7 +736,7 @@ class AssessmentService {
       const page = data?.page ? +data.page : 0;
       let offset = (page - 1) * limit;
       let sort_by = data?.sort_by || "createdAt";
-      let sort_order = data?.sort_order || "ASC";
+      let sort_order = data?.sort_order || "DESC";
       let order: Order = [[sort_by, sort_order]];
       const fetchAll = limit === 0 || page === 0;
 
@@ -891,6 +891,17 @@ class AssessmentService {
     userData: userAuthenticationData
   ): Promise<any> {
     try {
+      // let isLearner = await User.findOne({
+      //   where: { role: Roles.LEARNER }
+      // })
+      // let evidenceWhereCondition: any = {
+      //   deletedAt: null,
+      // }
+      // if (isLearner) {
+      //   evidenceWhereCondition.uploaded_by = {
+      //     [Op.ne]: "iqa"
+      //   }
+      // }
       let assessment: any = await Assessment.findByPk(assessmentId, {
         include: [
           {
@@ -924,6 +935,7 @@ class AssessmentService {
           {
             model: AssessmentNotes,
             as: "evidence_cycles",
+            // where: evidenceWhereCondition,
             required: false,
             include: [
               {
