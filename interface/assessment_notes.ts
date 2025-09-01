@@ -6,6 +6,7 @@ export interface AssessmentNotesInterface {
   feedback: string;
   is_main_assessment_note: boolean;
   cycle: number;
+  workflow_phase: number;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;

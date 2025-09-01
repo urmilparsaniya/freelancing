@@ -38,6 +38,30 @@ import AssessmentNotes from "../../database/schema/assessment_notes";
 import AssessmentNoteFiles from "../../database/schema/assessment_note_files";
 
 class AssessmentService {
+  /**
+   * Helper function to determine workflow phase based on assessment status and user role
+   * Workflow Phase Logic:
+   * - Phase 0: Initial assessment creation, assessor completion, assessor rejection
+   * - Phase 1: IQA disagreement, assessor response to IQA disagreement
+   * 
+   * @param assessmentStatus - Current assessment status
+   * @param userRole - Role of the user creating/updating the note
+   * @param previousStatus - Previous assessment status (for context)
+   * @returns workflow phase number (0 or 1)
+   */
+  static getWorkflowPhase(assessmentStatus: number, userRole: number, previousStatus?: number): number {
+    // IQA disagreed with comment = stage - 1 - status - 5
+    if (assessmentStatus === AssessmentStatus.NOT_AGREED_BY_IQA && userRole === Roles.IQA) {
+      return 1;
+    }
+    // Assessor comment and completed = stage - 1 - check if old status is 5 then stage set to 1 and it's assessor - status - 4
+    if (assessmentStatus === AssessmentStatus.ASSESSMENT_COMPLETED && userRole === Roles.ASSESSOR && previousStatus === AssessmentStatus.NOT_AGREED_BY_IQA) {
+      return 1;
+    }
+    // Default workflow phase for initial creation and other cases
+    return 0;
+  }
+
   // Create Assessment
   static async createAssessment(
     data: any,
@@ -626,78 +650,76 @@ class AssessmentService {
         try {
           const assessmentNote = await AssessmentNotes.findAll({
             where: { assessment_id: assessment.id },
-            order: [['cycle', 'DESC']]
+            order: [
+              ['cycle', 'DESC'],
+              ['updatedAt', 'DESC']
+            ]
           });
-          // check if assessment note is main assessment note then update it
+
+          // Helper function to create assessment note with files
+          const createAssessmentNoteWithFiles = async (noteData: any, fileIds: number[]) => {
+            const newNote = await AssessmentNotes.create(noteData, { transaction });
+            if (fileIds.length > 0 && newNote) {
+              await AssessmentNoteFiles.bulkCreate(
+                fileIds.map((fid) => ({
+                  assessment_note_id: newNote.id,
+                  file_id: fid,
+                })),
+                { transaction }
+              );
+            }
+            return newNote;
+          };
+
+          // Check if assessment note is main assessment note then update it
           if (assessmentNote.length == 1 && assessmentNote[0].is_main_assessment_note && userData_.role == Roles.ASSESSOR) {
             await assessmentNote[0].update({
               feedback: data.assessment_note,
+              workflow_phase: this.getWorkflowPhase(data.assessment_status || assessment.assessment_status, userData_.role)
             }, { transaction });
           } else {
-            // Now we need to check if API call came from learner then we need to create new assessment note
-            if (userData_.role == Roles.LEARNER) {
-              let assessmentNoteData = {
-                assessment_id: assessment.id,
-                user_id: userData_.id,
+            // Get current cycle or default to 1
+            const currentCycle = assessmentNote.length > 0 ? assessmentNote[0].cycle : 0;
+            
+            // Get previous status for workflow phase calculation
+            const previousStatus = assessmentNote.length > 0 ? assessmentNote[0].status : null;
+            
+            // Define role-specific configurations
+            const roleConfigs = {
+              [Roles.LEARNER]: {
                 uploaded_by: RoleSlug.LEARNER,
-                feedback: data.assessment_note,
-                is_main_assessment_note: false,
-                cycle: assessmentNote[0].cycle + 1 || 1,
-                status: data.assessment_status || AssessmentStatus.LEARNER_AGREED
-              };
-              let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
-              if (learnerFileIds.length > 0 && assessmentNote_) {
-                await AssessmentNoteFiles.bulkCreate(
-                  learnerFileIds.map((fid) => ({
-                    assessment_note_id: assessmentNote_.id,
-                    file_id: fid,
-                  })),
-                  { transaction }
-                );
-              }
-            }
-            // Now need to check if API call came from assessor then need to create new assessment note but cycle number is same 
-            if (userData_.role == Roles.ASSESSOR) {
-              let assessmentNoteData = {
-                assessment_id: assessment.id,
-                user_id: userData_.id,
+                cycle: currentCycle + 1,
+                status: data.assessment_status || AssessmentStatus.LEARNER_AGREED,
+                fileIds: learnerFileIds
+              },
+              [Roles.ASSESSOR]: {
                 uploaded_by: RoleSlug.ASSESSOR,
-                feedback: data.assessment_note,
-                is_main_assessment_note: false,
-                cycle: assessmentNote[0].cycle,
-                status: data.assessment_status
+                cycle: currentCycle,
+                status: data.assessment_status,
+                fileIds: fileIds
+              },
+              [Roles.IQA]: {
+                uploaded_by: RoleSlug.IQA,
+                cycle: currentCycle,
+                status: data.assessment_status,
+                fileIds: fileIds
               }
-              let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
-              if (fileIds.length > 0 && assessmentNote_) {
-                await AssessmentNoteFiles.bulkCreate(
-                  fileIds.map((fid) => ({
-                    assessment_note_id: assessmentNote_.id,
-                    file_id: fid,
-                  })),
-                  { transaction }
-                );
-              }
-            }
-            if (userData_.role == Roles.IQA) {
-              let assessmentNoteData = {
+            };
+
+            const config = roleConfigs[userData_.role];
+            if (config) {
+              const assessmentNoteData = {
                 assessment_id: assessment.id,
                 user_id: userData_.id,
-                uploaded_by: RoleSlug.IQA,
+                uploaded_by: config.uploaded_by,
                 feedback: data.assessment_note,
                 is_main_assessment_note: false,
-                cycle: assessmentNote[0].cycle,
-                status: data.assessment_status
-              }
-              let assessmentNote_ = await AssessmentNotes.create(assessmentNoteData, { transaction });
-              if (fileIds.length > 0 && assessmentNote_) {
-                await AssessmentNoteFiles.bulkCreate(
-                  fileIds.map((fid) => ({
-                    assessment_note_id: assessmentNote_.id,
-                    file_id: fid,
-                  })),
-                  { transaction }
-                );
-              }
+                cycle: config.cycle,
+                status: config.status,
+                workflow_phase: this.getWorkflowPhase(config.status, userData_.role, previousStatus)
+              };
+
+              await createAssessmentNoteWithFiles(assessmentNoteData, config.fileIds);
             }
           }
         } catch (error) {
@@ -891,17 +913,25 @@ class AssessmentService {
     userData: userAuthenticationData
   ): Promise<any> {
     try {
-      // let isLearner = await User.findOne({
-      //   where: { role: Roles.LEARNER }
-      // })
-      // let evidenceWhereCondition: any = {
-      //   deletedAt: null,
-      // }
-      // if (isLearner) {
-      //   evidenceWhereCondition.uploaded_by = {
-      //     [Op.ne]: "iqa"
-      //   }
-      // }
+      // Get user role to determine workflow phase filtering
+      const user = await User.findByPk(userData.id);
+      let evidenceWhereCondition: any = {
+        deletedAt: null,
+      };
+      
+      // Filter assessment notes based on user role and workflow phase
+      if (user && user.role === Roles.LEARNER) {
+        // Learners can only see assessment notes with workflow_phase = 0
+        // This hides IQA disagreement comments from learners
+        evidenceWhereCondition.workflow_phase = 0;
+      } else if (user && user.role === Roles.IQA) {
+        // IQA can see all assessment notes (no filtering)
+        // IQA needs to see all phases to understand the complete workflow
+      } else if (user && user.role === Roles.ASSESSOR) {
+        // Assessors can see all assessment notes (no filtering)
+        // Assessors need to see all phases to respond appropriately
+      }
+      
       let assessment: any = await Assessment.findByPk(assessmentId, {
         include: [
           {
@@ -935,7 +965,7 @@ class AssessmentService {
           {
             model: AssessmentNotes,
             as: "evidence_cycles",
-            // where: evidenceWhereCondition,
+            where: evidenceWhereCondition,
             required: false,
             include: [
               {

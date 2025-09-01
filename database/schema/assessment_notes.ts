@@ -24,6 +24,7 @@ class AssessmentNotes
   public feedback!: string;
   public is_main_assessment_note!: boolean;
   public cycle!: number;
+  public workflow_phase!: number;
   public createdAt!: Date;
   public updatedAt!: Date;
   public deletedAt!: Date;
@@ -64,6 +65,12 @@ AssessmentNotes.init(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    workflow_phase: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+      comment: "We manage this paramter for show or hide feedback in learner of iqa"
+    }
   },
   {
     ...BaseModel.initBaseOptions(sequelize),
