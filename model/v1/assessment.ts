@@ -51,11 +51,11 @@ class AssessmentService {
    */
   static getWorkflowPhase(assessmentStatus: number, userRole: number, previousStatus?: number): number {
     // IQA disagreed with comment = stage - 1 - status - 5
-    if (assessmentStatus === AssessmentStatus.NOT_AGREED_BY_IQA && userRole === Roles.IQA) {
+    if (+assessmentStatus === +AssessmentStatus.NOT_AGREED_BY_IQA && +userRole === +Roles.IQA) {
       return 1;
     }
     // Assessor comment and completed = stage - 1 - check if old status is 5 then stage set to 1 and it's assessor - status - 4
-    if (assessmentStatus === AssessmentStatus.ASSESSMENT_COMPLETED && userRole === Roles.ASSESSOR && previousStatus === AssessmentStatus.NOT_AGREED_BY_IQA) {
+    if (+assessmentStatus === +AssessmentStatus.ASSESSMENT_COMPLETED && +userRole === +Roles.ASSESSOR && +previousStatus === +AssessmentStatus.NOT_AGREED_BY_IQA) {
       return 1;
     }
     // Default workflow phase for initial creation and other cases
