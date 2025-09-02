@@ -30,4 +30,9 @@ router
   .route("/update/:id")
   .put(authenticateUser, qualificationController.updateQualification);
 
+// Clean existing records
+router
+  .route("/cleanup")
+  .get(authenticateUser, qualificationController.cleanExistingRecords);
+
 export default router;

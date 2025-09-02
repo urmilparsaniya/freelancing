@@ -12,6 +12,29 @@ import UserQualification from "../../database/schema/user_qualification";
 const { sequelize } = require("../../configs/database");
 
 class qualificationService {
+  // Helper method to clean description text
+  private static cleanDescriptionText(text: string): string {
+    if (!text) return "";
+    
+    const originalText = text;
+    const cleanedText = text
+      // Remove the specific bullet character we found in the database (U+F0B7)
+      .replace(/^\uF0B7\s*/, "")
+      // Remove common bullet points and special characters at the beginning
+      .replace(/^[\s•●▪‣◦¤··\-–—*\u2022\u2023\u25AA\u00B7\u2024\u2043\u2219\u25E6\u25AA\u25AB\u25B6\u25C0\u25C6\u25CB\u25D9\u25E7\u25F7\u25F8\u25F9\u25FA\u25FB\u25FC\u25FD\u25FE\u25FF]+/g, "")
+      // Remove common separators and formatting characters
+      .replace(/^[\s\-_*]+/g, "")
+      // Remove any remaining leading/trailing whitespace
+      .trim();
+    
+    // Log if there was significant cleaning done
+    if (originalText !== cleanedText) {
+      // console.log(`Cleaned text: "${originalText}" -> "${cleanedText}"`);
+    }
+    
+    return cleanedText;
+  }
+
   // Create qualification method
   static async createQualification(
     userData: userAuthenticationData,
@@ -118,18 +141,19 @@ class qualificationService {
             );
             currentSubOutcomeId = subOutCome.id;
           } else if (currentSubOutcomeId && !code && description) {
-            const cleanedDescription = description
-              .replace(/^[•●▪‣◦¤··\-–—*·\u2022\u2023\u25AA\s]+/, "")
-              .trim();
-            // Create SubPoints
-            await OutcomeSubpoints.create(
-              {
-                outcome_id: currentSubOutcomeId,
-                point_text: cleanedDescription,
-                created_by: userData.id,
-              },
-              { transaction }
-            );
+            const cleanedDescription = this.cleanDescriptionText(description);
+            
+            // Only create SubPoints if the cleaned description is not empty
+            if (cleanedDescription && cleanedDescription.length > 0) {
+              await OutcomeSubpoints.create(
+                {
+                  outcome_id: currentSubOutcomeId,
+                  point_text: cleanedDescription,
+                  created_by: userData.id,
+                },
+                { transaction }
+              );
+            }
           }
         }
       }
@@ -151,10 +175,111 @@ class qualificationService {
     }
   }
 
+  // Method to clean existing problematic records in the database
+  static async cleanExistingRecords(): Promise<any> {
+    try {
+      console.log("Starting cleanup of existing records...");
+      
+      // First, let's see what we actually have in the database
+      const allRecords = await OutcomeSubpoints.findAll({
+        limit: 20, // Just get a sample to see what we're working with
+        attributes: ['id', 'point_text']
+      });
+      
+      // Enhanced detection patterns - look for more variations
+      const problematicRecords = await OutcomeSubpoints.findAll({
+        where: {
+          [Op.or]: [
+            // Look for the specific bullet character we found (U+F0B7)
+            { point_text: { [Op.like]: '\uF0B7%' } },
+            // Look for records starting with various bullet points and special characters
+            { point_text: { [Op.like]: '•%' } },
+            { point_text: { [Op.like]: '●%' } },
+            { point_text: { [Op.like]: '▪%' } },
+            { point_text: { [Op.like]: '‣%' } },
+            { point_text: { [Op.like]: '◦%' } },
+            { point_text: { [Op.like]: '¤%' } },
+            { point_text: { [Op.like]: '·%' } },
+            { point_text: { [Op.like]: '·%' } },
+            { point_text: { [Op.like]: '-%' } },
+            { point_text: { [Op.like]: '–%' } },
+            { point_text: { [Op.like]: '—%' } },
+            { point_text: { [Op.like]: '*%' } },
+            { point_text: { [Op.like]: '\u2022%' } },
+            { point_text: { [Op.like]: '\u2023%' } },
+            { point_text: { [Op.like]: '\u25AA%' } },
+            // Look for records with leading spaces or tabs
+            { point_text: { [Op.like]: ' %' } },
+            { point_text: { [Op.like]: '\t%' } },
+            // Look for records that might have been partially cleaned
+            { point_text: { [Op.like]: '  %' } }, // Double spaces
+            { point_text: { [Op.like]: '   %' } }, // Triple spaces
+            // Look for any non-alphanumeric characters at the start
+            { point_text: { [Op.regexp]: '^[^a-zA-Z0-9]' } }
+          ]
+        }
+      });
+
+      // Also check for records that might have been cleaned but still have issues
+      const potentiallyProblematic = await OutcomeSubpoints.findAll({
+        where: {
+          point_text: {
+            [Op.and]: [
+              { [Op.ne]: null },
+              { [Op.ne]: '' },
+              { [Op.regexp]: '^[\\s\\-\\_\\*\\•\\●\\▪\\‣\\◦\\¤\\·\\·\\–\\—\\\u2022\\\u2023\\\u25AA\\\uF0B7]+' }
+            ]
+          }
+        }
+      });
+
+      let cleanedCount = 0;
+      
+      // Process the main problematic records
+      for (const record of problematicRecords) {
+        const originalText = record.point_text;
+        const cleanedText = this.cleanDescriptionText(originalText);
+        
+        if (cleanedText !== originalText && cleanedText.length > 0) {
+          await record.update({ point_text: cleanedText });
+          cleanedCount++;
+        }
+      }
+
+      // Process potentially problematic records
+      for (const record of potentiallyProblematic) {
+        const originalText = record.point_text;
+        const cleanedText = this.cleanDescriptionText(originalText);
+        
+        if (cleanedText !== originalText && cleanedText.length > 0) {
+          await record.update({ point_text: cleanedText });
+          cleanedCount++;
+        }
+      }
+
+      return {
+        status: STATUS_CODES.SUCCESS,
+        data: { 
+          totalFound: problematicRecords.length + potentiallyProblematic.length, 
+          cleaned: cleanedCount,
+          sampleRecords: allRecords.map(r => ({ id: r.id, text: r.point_text }))
+        },
+        message: `Successfully cleaned ${cleanedCount} out of ${problematicRecords.length + potentiallyProblematic.length} problematic records.`
+      };
+    } catch (error) {
+      console.error("Error cleaning existing records:", error);
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+      };
+    }
+  }
+
   // Get qualifications method
   static async getQualifications(
     qualificationId: number | string,
-    userData: userAuthenticationData
+    userData: userAuthenticationData,
+    learnerId?: number | string
   ): Promise<any> {
     try {
       const units = await Units.findAll({
@@ -195,10 +320,54 @@ class qualificationService {
             id: outcome.id,
           };
 
+          // Add outcome_marks - either from assessment_marks (if learner_id provided) or from SubOutcomes table
+          if (learnerId) {
+            const outcomeMarksData = await this.getOutcomeMarksFromAssessment(
+              outcome.id,
+              learnerId,
+              qualificationId
+            );
+            outcomeEntry.outcome_marks = outcomeMarksData?.total_marks || "0";
+            outcomeEntry.max_outcome_marks = outcomeMarksData?.max_marks || outcome.marks || "0";
+          } else {
+            outcomeEntry.outcome_marks = "0";
+            outcomeEntry.max_outcome_marks = outcome.marks || "0";
+          }
+
           if (outcome.outcomeSubpoints && outcome.outcomeSubpoints.length) {
+            // Keep existing subPoints for backward compatibility
             outcomeEntry.subPoints = outcome.outcomeSubpoints.map(
               (p) => p.point_text
             );
+
+            // Add new sub_points with id and mark if learner_id is provided
+            if (learnerId) {
+              outcomeEntry.sub_points = await Promise.all(
+                outcome.outcomeSubpoints.map(async (p) => {
+                  // Get the latest assessment mark for this specific subpoint and learner
+                  const latestMarkData = await this.getLatestAssessmentMark(
+                    p.id,
+                    learnerId,
+                    qualificationId
+                  );
+                  
+                  return {
+                    id: p.id,
+                    point_text: p.point_text,
+                    mark: latestMarkData?.marks || "0",
+                    max_marks: latestMarkData?.max_marks || p.marks || "0" // Use assessment max_marks if available, otherwise fallback to subpoint marks
+                  };
+                })
+              );
+            } else {
+              // If no learner_id, just provide the structure without marks
+              outcomeEntry.sub_points = outcome.outcomeSubpoints.map((p) => ({
+                id: p.id,
+                point_text: p.point_text,
+                mark: "0",
+                max_marks: p.marks || "0" // Add max marks from OutcomeSubpoints table
+              }));
+            }
           }
 
           outcomes.push(outcomeEntry);
@@ -225,6 +394,83 @@ class qualificationService {
         status: STATUS_CODES.SERVER_ERROR,
         message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
       };
+    }
+  }
+
+  // Helper method to get the latest assessment mark for a specific subpoint and learner
+  private static async getLatestAssessmentMark(
+    subpointId: number,
+    learnerId: number | string,
+    qualificationId: number | string
+  ): Promise<{ marks: string | null; max_marks: string | null } | null> {
+    try {
+      // Import AssessmentMarks model dynamically to avoid circular dependencies
+      const AssessmentMarks = require("../../database/schema/assessment_marks").default;
+      
+      const latestMark = await AssessmentMarks.findOne({
+        where: {
+          subpoint_id: subpointId,
+          learner_id: learnerId,
+          qualification_id: qualificationId,
+          deletedAt: null
+        },
+        order: [["createdAt", "DESC"]], // Get the most recent mark
+        attributes: ["marks", "max_marks"]
+      });
+
+      return latestMark ? {
+        marks: latestMark.marks,
+        max_marks: latestMark.max_marks
+      } : null;
+    } catch (error) {
+      console.error("Error fetching assessment mark:", error);
+      return null;
+    }
+  }
+
+  // Helper method to get outcome-level marks from assessment_marks table
+  private static async getOutcomeMarksFromAssessment(
+    outcomeId: number,
+    learnerId: number | string,
+    qualificationId: number | string
+  ): Promise<{ total_marks: string | null; max_marks: string | null } | null> {
+    try {
+      // Import AssessmentMarks model dynamically to avoid circular dependencies
+      const AssessmentMarks = require("../../database/schema/assessment_marks").default;
+      
+      // Get all assessment marks for this outcome, learner, and qualification
+      const assessmentMarks = await AssessmentMarks.findAll({
+        where: {
+          sub_outcome_id: outcomeId,
+          learner_id: learnerId,
+          qualification_id: qualificationId,
+          deletedAt: null
+        },
+        order: [["createdAt", "DESC"]], // Get the most recent marks
+        attributes: ["marks", "max_marks"]
+      });
+
+      if (assessmentMarks.length === 0) {
+        return null;
+      }
+
+      // Calculate total marks and max marks
+      let totalMarks = 0;
+      let maxMarks = 0;
+
+      assessmentMarks.forEach(record => {
+        totalMarks += parseInt(record.marks || "0", 10);
+        maxMarks += parseInt(record.max_marks || "0", 10);
+      });
+      console.log("totalMarks", totalMarks);
+      console.log("maxMarks", maxMarks);
+      return {
+        total_marks: totalMarks.toString(),
+        max_marks: maxMarks.toString()
+      };
+    } catch (error) {
+      console.error("Error fetching outcome marks from assessment:", error);
+      return null;
     }
   }
 
@@ -532,18 +778,19 @@ class qualificationService {
           );
           currentSubOutcomeId = subOutCome.id;
         } else if (currentSubOutcomeId && !code && description) {
-          const cleanedDescription = description
-            .replace(/^[•●▪‣◦¤··\-–—*·\u2022\u2023\u25AA\s]+/, "")
-            .trim();
+          const cleanedDescription = this.cleanDescriptionText(description);
 
-          await OutcomeSubpoints.create(
-            {
-              outcome_id: currentSubOutcomeId,
-              point_text: cleanedDescription,
-              created_by: userData.id,
-            },
-            { transaction }
-          );
+          // Only create SubPoints if the cleaned description is not empty
+          if (cleanedDescription && cleanedDescription.length > 0) {
+            await OutcomeSubpoints.create(
+              {
+                outcome_id: currentSubOutcomeId,
+                point_text: cleanedDescription,
+                created_by: userData.id,
+              },
+              { transaction }
+            );
+          }
         }
       }
     }

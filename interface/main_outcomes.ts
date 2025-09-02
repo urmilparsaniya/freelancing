@@ -6,6 +6,7 @@ export interface MainOutcomesInterface {
   description: string;
   created_by: number;
   status: number; // 1: Active, 2: Inactive
+  marks: string;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date;

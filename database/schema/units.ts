@@ -14,6 +14,7 @@ class Units extends Model<UnitsInterface> implements UnitsInterface {
   public unit_ref_no!: string;
   public created_by!: number;
   public status!: number;
+  public marks!: string;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -49,6 +50,12 @@ Units.init(
       comment: "1: Active, 2: Inactive",
       defaultValue: 1,
     },
+    marks: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "Marks for the unit",
+      defaultValue: "2",
+    }
   },
   {
     ...BaseModel.initBaseOptions(sequelize),

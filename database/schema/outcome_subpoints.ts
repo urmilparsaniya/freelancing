@@ -14,6 +14,7 @@ class OutcomeSubpoints
   public point_text!: string;
   public created_by!: number;
   public status!: number;
+  public marks!: string;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -40,6 +41,12 @@ OutcomeSubpoints.init(
       comment: "1: Active, 2: Inactive",
       defaultValue: 1,
     },
+    marks: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "Marks for the outcome subpoint",
+      defaultValue: "2",
+    }
   },
   {
     ...BaseModel.initBaseOptions(sequelize),

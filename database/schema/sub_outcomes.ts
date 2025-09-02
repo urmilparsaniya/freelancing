@@ -15,6 +15,7 @@ class SubOutcomes extends Model<SubOutcomesInterface> implements SubOutcomesInte
   public outcome_number!: string;
   public created_by!: number;
   public status!: number;
+  public marks!: string;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -54,6 +55,12 @@ SubOutcomes.init(
       comment: "1: Active, 2: Inactive",
       defaultValue: 1,
     },
+    marks: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "Marks for the sub outcome",
+      defaultValue: "2",
+    }
   },
   {
     ...BaseModel.initBaseOptions(sequelize),

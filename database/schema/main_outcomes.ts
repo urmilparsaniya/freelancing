@@ -12,6 +12,7 @@ class MainOutcomes extends Model<MainOutcomesInterface> implements MainOutcomesI
   public description!: string;
   public created_by!: number;
   public status!: number; // 1: Active, 2: Inactive
+  public marks!: string;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -45,6 +46,12 @@ MainOutcomes.init(
       comment: "1: Active, 2: Inactive",
       defaultValue: 1,
     },
+    marks: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "Marks for the main outcome",
+      defaultValue: "2",
+    }
   },
   {
     ...BaseModel.initBaseOptions(sequelize),
