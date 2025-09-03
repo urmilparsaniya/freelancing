@@ -4,6 +4,8 @@ const { sequelize } = require("../../configs/database");
 import BaseModel from "./base";
 import { TABLE_NAME } from "../../configs/tables";
 import { AssessmentMarksInterface } from "../../interface/assessment_marks";
+import Qualifications from "./qualifications";
+import Units from "./units";
 
 class AssessmentMarks
   extends Model<AssessmentMarksInterface>
@@ -82,5 +84,9 @@ AssessmentMarks.init(
     tableName: TABLE_NAME.ASSESSMENT_MARKS,
   }
 );
+
+// Define associations
+AssessmentMarks.belongsTo(Qualifications, { foreignKey: 'qualification_id', as: 'qualification' });
+AssessmentMarks.belongsTo(Units, { foreignKey: 'unit_id', as: 'unit' });
 
 export default AssessmentMarks;

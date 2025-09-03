@@ -36,6 +36,7 @@ import AssessmentUnits from "../../database/schema/assessment_units";
 import AssessmentLearner from "../../database/schema/assessment_learners";
 import AssessmentNotes from "../../database/schema/assessment_notes";
 import AssessmentNoteFiles from "../../database/schema/assessment_note_files";
+import AssessmentMarks from "../../database/schema/assessment_marks";
 
 class AssessmentService {
   /**
@@ -365,6 +366,7 @@ class AssessmentService {
             "Only Admins, Assessors and IQA are allowed to update assessments.",
         };
       }
+      
       let assessment = await Assessment.findByPk(assessmentId);
       if (!assessment) {
         await transaction.rollback();
@@ -373,6 +375,8 @@ class AssessmentService {
           message: "Assessment not found",
         };
       }
+
+
 
       // Update Assessment Methods
       if (data.method_ids) {
@@ -385,6 +389,7 @@ class AssessmentService {
           // Validate methods exist
           const validMethods = await Methods.findAll({
             where: { id: methodsIds, deletedAt: null },
+            transaction,
           });
 
           if (validMethods.length !== methodsIds.length) {
@@ -429,6 +434,7 @@ class AssessmentService {
           // Validate units exist
           const validUnits = await Units.findAll({
             where: { id: unitIds, deletedAt: null },
+            transaction,
           });
 
           if (validUnits.length !== unitIds.length) {
@@ -473,6 +479,7 @@ class AssessmentService {
           // Validate learners exist
           const validLearners = await User.findAll({
             where: { id: learnerIds, deletedAt: null, role: Roles.LEARNER },
+            transaction,
           });
 
           if (validLearners.length !== learnerIds.length) {
@@ -508,14 +515,17 @@ class AssessmentService {
         }
       }
 
+      // Check if user is learner and update status if needed
       let isLearner_ = await User.findOne({
         where: { id: userData.id, role: Roles.LEARNER },
       });
+      
       // Update Assessment
       // Check if login user is learner and have uploaded learner images then changes assessment_status
       if (learnerFiles && learnerFiles.length > 0 && isLearner_) {
         data.assessment_status = AssessmentStatus.LEARNER_AGREED;
       }
+      
       try {
         await assessment.update(data, { transaction });
       } catch (updateError) {
@@ -527,13 +537,15 @@ class AssessmentService {
         };
       }
 
-      // Handle file uploads first
-      let fileIds = [];
-      if (files && files.length > 0) {
-        for (const file of files) {
+      // Helper function for file processing
+      const processFiles = async (files: any[], entityType: string, folder: string): Promise<number[]> => {
+        if (!files || files.length === 0) return [];
+        
+        const fileIds = [];
+        const filePromises = files.map(async (file) => {
           try {
             const extension = extname(file.originalname);
-            const mainFileName = `assessment/${uuidv4()}${extension}`;
+            const mainFileName = `${folder}/${uuidv4()}${extension}`;
             const fileUrl = await uploadFileOnAWS(file, mainFileName);
             const fileType = await this.getFileType(file.mimetype);
             const fileSize = file.size;
@@ -542,42 +554,7 @@ class AssessmentService {
             // Create File
             const fileCreated = await Image.create(
               {
-                entity_type: Entity.ASSESSMENT,
-                entity_id: assessment.id, // Remove + operator as assessment.id is already a number
-                image: fileUrl,
-                image_type: fileType,
-                image_name: fileName,
-                image_size: fileSize,
-              },
-              { transaction }
-            );
-            fileIds.push(fileCreated.id);
-          } catch (fileError) {
-            console.error("Error uploading file:", fileError);
-            await transaction.rollback();
-            return {
-              status: STATUS_CODES.SERVER_ERROR,
-              message: "Error uploading file",
-            };
-          }
-        }
-      }
-
-      // Handle file upload of learner
-      let learnerFileIds = [];
-      if (learnerFiles && learnerFiles.length > 0) {
-        for (const learnerFile of learnerFiles) {
-          try {
-            const extension = extname(learnerFile.originalname);
-            const mainFileName = `learner/${uuidv4()}${extension}`;
-            const fileUrl = await uploadFileOnAWS(learnerFile, mainFileName);
-            const fileType = await this.getFileType(learnerFile.mimetype);
-            const fileSize = learnerFile.size;
-            const fileName = learnerFile.originalname;
-            // Create Learner File
-            const fileCreated = await Image.create(
-              {
-                entity_type: Entity.LEARNER_ASSESSMENT,
+                entity_type: entityType,
                 entity_id: assessment.id,
                 image: fileUrl,
                 image_type: fileType,
@@ -586,16 +563,39 @@ class AssessmentService {
               },
               { transaction }
             );
-            learnerFileIds.push(fileCreated.id);
-          } catch (error) {
-            console.log("Error uploading learner file:", error);
-            await transaction.rollback();
-            return {
-              status: STATUS_CODES.SERVER_ERROR,
-              message: "Error uploading learner file",
-            };
+            return fileCreated.id;
+          } catch (fileError) {
+            console.error(`Error uploading ${folder} file:`, fileError);
+            throw fileError;
           }
+        });
+
+        try {
+          const results = await Promise.all(filePromises);
+          fileIds.push(...results);
+        } catch (error) {
+          throw error;
         }
+
+        return fileIds;
+      };
+
+      // Process files in parallel
+      let fileIds: number[] = [];
+      let learnerFileIds: number[] = [];
+      
+      try {
+        [fileIds, learnerFileIds] = await Promise.all([
+          processFiles(files, Entity.ASSESSMENT, "assessment"),
+          processFiles(learnerFiles, Entity.LEARNER_ASSESSMENT, "learner")
+        ]);
+      } catch (fileError) {
+        console.error("Error uploading files:", fileError);
+        await transaction.rollback();
+        return {
+          status: STATUS_CODES.SERVER_ERROR,
+          message: "Error uploading files",
+        };
       }
 
       // Handle file deletions - fix race condition
@@ -627,14 +627,16 @@ class AssessmentService {
           });
 
           // Delete files from AWS after database deletion
-          for (const image of imagesToDelete) {
+          const deletePromises = imagesToDelete.map(async (image) => {
             try {
               await deleteFileOnAWS(image.image);
             } catch (awsError) {
               console.error("Error deleting file from AWS:", awsError);
               // Continue with other deletions even if one fails
             }
-          }
+          });
+          
+          await Promise.all(deletePromises);
         } catch (deleteError) {
           console.error("Error deleting files:", deleteError);
           await transaction.rollback();
@@ -728,6 +730,89 @@ class AssessmentService {
           return {
             status: STATUS_CODES.SERVER_ERROR,
             message: "Error updating assessment note",
+          };
+        }
+      }
+
+      // Handle Assessment Mark
+      if (data.assessment_mark) {
+        try {
+          const marksData = data.assessment_mark;
+          
+          // Basic validation for required parameters
+          if (!marksData.assessment_id || !marksData.learner_id || !marksData.marks || !Array.isArray(marksData.marks)) {
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.BAD_REQUEST,
+              message: "Assessment mark data is missing required parameters: assessment_id, learner_id, and marks array",
+            };
+          }
+          
+          // Process each mark entry
+          for (const markEntry of marksData.marks) {
+            const {
+              qualification_id,
+              unit_id,
+              main_outcome_id,
+              sub_outcome_id,
+              subpoint_id,
+              marks
+            } = markEntry;
+
+            // Find qualification by qualification_no (e.g., "Q1") to get the actual ID
+            let qualificationRecord = null;
+            if (qualification_id) {
+              qualificationRecord = await Qualifications.findOne({
+                where: { 
+                  qualification_no: qualification_id,
+                  deletedAt: null 
+                },
+                transaction
+              });
+            }
+
+            // Check if marks already exist for this specific criteria to determine attempt number
+            const existingMarks = await AssessmentMarks.findOne({
+              where: {
+                assessment_id: marksData.assessment_id,
+                learner_id: marksData.learner_id,
+                qualification_id: qualificationRecord ? qualificationRecord.id : null,
+                unit_id: unit_id,
+                main_outcome_id: main_outcome_id,
+                sub_outcome_id: sub_outcome_id,
+                subpoint_id: subpoint_id,
+                deletedAt: null
+              },
+              order: [['attempt', 'DESC']],
+              transaction
+            });
+
+            // Calculate attempt number - if marks exist, increment by 1, otherwise start with 1
+            const attemptNumber = existingMarks ? (parseInt(existingMarks.attempt) + 1).toString() : "1";
+
+            // Create new mark entry with proper attempt number
+            await AssessmentMarks.create({
+              assessment_id: marksData.assessment_id,
+              learner_id: marksData.learner_id,
+              assessor_id: userData_.id,
+              qualification_id: qualificationRecord ? qualificationRecord.id : null,
+              unit_id: unit_id,
+              main_outcome_id: main_outcome_id,
+              sub_outcome_id: sub_outcome_id,
+              subpoint_id: subpoint_id,
+              marks: marks.toString(),
+              max_marks: "2", // Default max marks
+              attempt: attemptNumber
+            }, { transaction });
+          }
+          
+          console.log(`Successfully processed ${marksData.marks.length} mark entries for assessment ${marksData.assessment_id}, learner ${marksData.learner_id}`);
+        } catch (error) {
+          console.error("Error updating assessment mark:", error);
+          await transaction.rollback();
+          return {
+            status: STATUS_CODES.SERVER_ERROR,
+            message: "Error updating assessment mark",
           };
         }
       }
@@ -1248,6 +1333,94 @@ class AssessmentService {
     } catch (error) {
       console.error("Error updating assessment status:", error);
       await transaction.rollback();
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: "Server error",
+      };
+    }
+  }
+
+  // Get Assessment Marks
+  static async getAssessmentMarks(
+    assessmentId: string,
+    learnerId: string,
+    userData: userAuthenticationData
+  ): Promise<any> {
+    try {
+      // Validate that the user has access to this assessment
+      const assessment = await Assessment.findByPk(assessmentId);
+      if (!assessment) {
+        return {
+          status: STATUS_CODES.NOT_FOUND,
+          message: "Assessment not found",
+        };
+      }
+
+      // Check if user is assessor, IQA, or admin for this assessment
+      let hasAccess = false;
+      if (userData.role === Roles.ADMIN) {
+        hasAccess = true;
+      } else if (userData.role === Roles.ASSESSOR && assessment.assessor_id === userData.id) {
+        hasAccess = true;
+      } else if (userData.role === Roles.IQA) {
+        // IQA can access assessments in their center
+        const user = await User.findByPk(userData.id);
+        if (user && user.center_id === assessment.center_id) {
+          hasAccess = true;
+        }
+      } else if (userData.role === Roles.LEARNER && parseInt(learnerId) === userData.id) {
+        // Learner can only see their own marks
+        hasAccess = true;
+      }
+
+      if (!hasAccess) {
+        return {
+          status: STATUS_CODES.FORBIDDEN,
+          message: "You don't have permission to view these assessment marks",
+        };
+      }
+
+      // Get assessment marks
+      const marks = await AssessmentMarks.findAll({
+        where: {
+          assessment_id: assessmentId,
+          learner_id: learnerId,
+          deletedAt: null
+        },
+        include: [
+          {
+            model: Qualifications,
+            as: "qualification",
+            required: false,
+            attributes: ["id", "name", "qualification_no"]
+          },
+          {
+            model: Units,
+            as: "unit",
+            required: false,
+            attributes: ["id", "name", "unit_code"]
+          }
+        ],
+        order: [
+          ["qualification_id", "ASC"],
+          ["unit_id", "ASC"],
+          ["main_outcome_id", "ASC"],
+          ["sub_outcome_id", "ASC"],
+          ["subpoint_id", "ASC"]
+        ]
+      });
+
+      return {
+        status: STATUS_CODES.SUCCESS,
+        data: {
+          assessment_id: assessmentId,
+          learner_id: learnerId,
+          marks: marks
+        },
+        message: "Assessment marks retrieved successfully",
+      };
+    } catch (error) {
+      console.error("Error retrieving assessment marks:", error);
       return {
         status: STATUS_CODES.SERVER_ERROR,
         message: "Server error",
