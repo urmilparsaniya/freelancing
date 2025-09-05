@@ -734,10 +734,36 @@ class AssessmentService {
         }
       }
 
+      // Check if Assessor rejected the assessment
+      if (userData_.role === Roles.ASSESSOR && data.assessment_status === AssessmentStatus.ASSESSOR_REJECT) {
+        try {
+          // Delete all assessment mark entries for this assessment
+          const deletedMarks = await AssessmentMarks.destroy({
+            where: {
+              assessment_id: assessment.id
+            },
+            force: true, // Hard delete
+            transaction
+          });
+          
+          console.log(`Deleted ${deletedMarks} assessment mark entries due to IQA rejection`);
+        } catch (error) {
+          console.error("Error deleting assessment marks after IQA rejection:", error);
+          await transaction.rollback();
+          return {
+            status: STATUS_CODES.SERVER_ERROR,
+            message: "Error deleting assessment marks after IQA rejection",
+          };
+        }
+      }
+
       // Handle Assessment Mark
       if (data.assessment_mark) {
         try {
-          const marksData = data.assessment_mark;
+          let marksData = data.assessment_mark;
+          if (typeof marksData === 'string') {
+            marksData = JSON.parse(marksData);
+          }
           
           // Basic validation for required parameters
           if (!marksData.assessment_id || !marksData.learner_id || !marksData.marks || !Array.isArray(marksData.marks)) {
@@ -759,53 +785,53 @@ class AssessmentService {
               marks
             } = markEntry;
 
-            // Find qualification by qualification_no (e.g., "Q1") to get the actual ID
-            let qualificationRecord = null;
-            if (qualification_id) {
-              qualificationRecord = await Qualifications.findOne({
-                where: { 
-                  qualification_no: qualification_id,
-                  deletedAt: null 
-                },
-                transaction
-              });
-            }
-
             // Check if marks already exist for this specific criteria to determine attempt number
             const existingMarks = await AssessmentMarks.findOne({
               where: {
                 assessment_id: marksData.assessment_id,
                 learner_id: marksData.learner_id,
-                qualification_id: qualificationRecord ? qualificationRecord.id : null,
-                unit_id: unit_id,
-                main_outcome_id: main_outcome_id,
-                sub_outcome_id: sub_outcome_id,
-                subpoint_id: subpoint_id,
+                qualification_id: qualification_id,
+                unit_id: unit_id || null,
+                main_outcome_id: main_outcome_id || null,
+                sub_outcome_id: sub_outcome_id || null,
+                subpoint_id: subpoint_id || null,
                 deletedAt: null
               },
               order: [['attempt', 'DESC']],
               transaction
             });
 
-            // Calculate attempt number - if marks exist, increment by 1, otherwise start with 1
-            const attemptNumber = existingMarks ? (parseInt(existingMarks.attempt) + 1).toString() : "1";
-
-            // Create new mark entry with proper attempt number
-            await AssessmentMarks.create({
-              assessment_id: marksData.assessment_id,
-              learner_id: marksData.learner_id,
-              assessor_id: userData_.id,
-              qualification_id: qualificationRecord ? qualificationRecord.id : null,
-              unit_id: unit_id,
-              main_outcome_id: main_outcome_id,
-              sub_outcome_id: sub_outcome_id,
-              subpoint_id: subpoint_id,
-              marks: marks.toString(),
-              max_marks: "2", // Default max marks
-              attempt: attemptNumber
-            }, { transaction });
+            if (existingMarks) {
+              // Update the existing record
+              await existingMarks.update({
+                marks: marks.toString(),
+                assessor_id: userData_.id
+              }, { transaction });
+            } else {
+              // Calculate attempt number - if marks exist, increment by 1, otherwise start with 1
+              const attemptNumber = existingMarks
+                ? (parseInt(existingMarks.attempt) + 1).toString()
+                : "1";
+              
+              // Create new mark entry with proper attempt number
+              await AssessmentMarks.create(
+                {
+                  assessment_id: marksData.assessment_id,
+                  learner_id: marksData.learner_id,
+                  assessor_id: userData_.id,
+                  qualification_id: qualification_id,
+                  unit_id: unit_id,
+                  main_outcome_id: main_outcome_id,
+                  sub_outcome_id: sub_outcome_id,
+                  subpoint_id: subpoint_id,
+                  marks: marks.toString(),
+                  max_marks: "2", // Default max marks
+                  attempt: attemptNumber,
+                },
+                { transaction }
+              );
+            }
           }
-          
           console.log(`Successfully processed ${marksData.marks.length} mark entries for assessment ${marksData.assessment_id}, learner ${marksData.learner_id}`);
         } catch (error) {
           console.error("Error updating assessment mark:", error);

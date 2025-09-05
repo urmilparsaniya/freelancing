@@ -31,13 +31,15 @@ class qualificationController {
   static async getQualifications(req: Request, res: Response): Promise<void> {
     try {
       let qualificationId = req.params.id as number | string;
+      let assessmentId = req.query.assessment_id as number | string;
       let userData = req.headers["user_info"] as userAuthenticationData;
       let learnerId = req.query.learner_id as number | string;
       
       let request = await qualificationService.getQualifications(
         qualificationId,
         userData,
-        learnerId
+        learnerId,
+        assessmentId
       );
       if (request.status !== STATUS_CODES.SUCCESS) {
         res.handler.errorResponse(request.status, request.message);

@@ -279,7 +279,8 @@ class qualificationService {
   static async getQualifications(
     qualificationId: number | string,
     userData: userAuthenticationData,
-    learnerId?: number | string
+    learnerId?: number | string,
+    assessmentId?: number | string
   ): Promise<any> {
     try {
       const units = await Units.findAll({
@@ -325,7 +326,8 @@ class qualificationService {
             const outcomeMarksData = await this.getOutcomeMarksFromAssessment(
               outcome.id,
               learnerId,
-              qualificationId
+              qualificationId,
+              assessmentId
             );
             outcomeEntry.outcome_marks = outcomeMarksData?.total_marks || "0";
             outcomeEntry.max_outcome_marks = outcomeMarksData?.max_marks || outcome.marks || "0";
@@ -348,7 +350,8 @@ class qualificationService {
                   const latestMarkData = await this.getLatestAssessmentMark(
                     p.id,
                     learnerId,
-                    qualificationId
+                    qualificationId,
+                    assessmentId
                   );
                   
                   return {
@@ -401,19 +404,23 @@ class qualificationService {
   private static async getLatestAssessmentMark(
     subpointId: number,
     learnerId: number | string,
-    qualificationId: number | string
+    qualificationId: number | string,
+    assessmentId?: number | string
   ): Promise<{ marks: string | null; max_marks: string | null } | null> {
     try {
       // Import AssessmentMarks model dynamically to avoid circular dependencies
       const AssessmentMarks = require("../../database/schema/assessment_marks").default;
-      
+      let assessmentWhere: any = {
+        subpoint_id: subpointId,
+        learner_id: learnerId,
+        qualification_id: qualificationId,
+        deletedAt: null
+      };
+      if (assessmentId) {
+        assessmentWhere.assessment_id = assessmentId;
+      }
       const latestMark = await AssessmentMarks.findOne({
-        where: {
-          subpoint_id: subpointId,
-          learner_id: learnerId,
-          qualification_id: qualificationId,
-          deletedAt: null
-        },
+        where: assessmentWhere,
         order: [["createdAt", "DESC"]], // Get the most recent mark
         attributes: ["marks", "max_marks"]
       });
@@ -432,38 +439,37 @@ class qualificationService {
   private static async getOutcomeMarksFromAssessment(
     outcomeId: number,
     learnerId: number | string,
-    qualificationId: number | string
+    qualificationId: number | string,
+    assessmentId?: number | string
   ): Promise<{ total_marks: string | null; max_marks: string | null } | null> {
     try {
       // Import AssessmentMarks model dynamically to avoid circular dependencies
       const AssessmentMarks = require("../../database/schema/assessment_marks").default;
       
+      let assessmentWhere: any = {
+        sub_outcome_id: outcomeId,
+        subpoint_id: null,
+        learner_id: learnerId,
+        qualification_id: qualificationId,
+        deletedAt: null,
+      };
+      if (assessmentId) {
+        assessmentWhere.assessment_id = assessmentId;
+      }
       // Get all assessment marks for this outcome, learner, and qualification
-      const assessmentMarks = await AssessmentMarks.findAll({
-        where: {
-          sub_outcome_id: outcomeId,
-          learner_id: learnerId,
-          qualification_id: qualificationId,
-          deletedAt: null
-        },
-        order: [["createdAt", "DESC"]], // Get the most recent marks
-        attributes: ["marks", "max_marks"]
-      });
+      const assessmentMarks = await AssessmentMarks.findOne({
+        where: assessmentWhere,
+        order: [["attempt", "DESC"], ["createdAt", "DESC"]],
+        attributes: ["marks", "max_marks", "attempt"]
+      })
 
-      if (assessmentMarks.length === 0) {
+      if (!assessmentMarks) {
         return null;
       }
 
       // Calculate total marks and max marks
-      let totalMarks = 0;
-      let maxMarks = 0;
-
-      assessmentMarks.forEach(record => {
-        totalMarks += parseInt(record.marks || "0", 10);
-        maxMarks += parseInt(record.max_marks || "0", 10);
-      });
-      console.log("totalMarks", totalMarks);
-      console.log("maxMarks", maxMarks);
+      let totalMarks = parseFloat(assessmentMarks.marks || "0");
+      let maxMarks = parseFloat(assessmentMarks.max_marks || "0");
       return {
         total_marks: totalMarks.toString(),
         max_marks: maxMarks.toString()
