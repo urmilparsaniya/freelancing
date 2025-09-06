@@ -762,7 +762,7 @@ class AssessmentService {
         try {
           let marksData = data.assessment_mark;
           if (typeof marksData === 'string') {
-            marksData = JSON.parse(marksData);
+            // marksData = JSON.parse(marksData);
           }
           
           // Basic validation for required parameters
