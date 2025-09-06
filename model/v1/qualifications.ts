@@ -9,6 +9,8 @@ import OutcomeSubpoints from "../../database/schema/outcome_subpoints";
 import { Op, Order, Sequelize } from "sequelize";
 import { paginate, qualificationUserId } from "../../helper/utils";
 import UserQualification from "../../database/schema/user_qualification";
+import Assessment from "../../database/schema/assessment";
+import AssessmentUnits from "../../database/schema/assessment_units";
 const { sequelize } = require("../../configs/database");
 
 class qualificationService {
@@ -283,8 +285,20 @@ class qualificationService {
     assessmentId?: number | string
   ): Promise<any> {
     try {
+      let unitWhereCondition: any = {
+        qualification_id: qualificationId
+      }
+      if (assessmentId) {
+        let assessmentData = await AssessmentUnits.findAll({
+          where: { assessment_id: assessmentId }
+        })
+        let unitIds = assessmentData.map((item) => item.unit_id);
+        if (unitIds.length > 0) {
+          unitWhereCondition.id = unitIds; // Sequelize auto treats array as IN
+        }
+      }
       const units = await Units.findAll({
-        where: { qualification_id: qualificationId },
+        where: unitWhereCondition,
         include: [
           {
             model: SubOutcomes,
