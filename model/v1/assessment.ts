@@ -390,7 +390,6 @@ class AssessmentService {
             "Only Admins, Assessors and IQA are allowed to update assessments.",
         };
       }
-
       let assessment = await Assessment.findByPk(assessmentId);
       if (!assessment) {
         await transaction.rollback();
@@ -404,7 +403,6 @@ class AssessmentService {
       if (data.method_ids) {
         try {
           const methodsIds = data.method_ids
-            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()))
             .filter(Boolean);
@@ -412,7 +410,6 @@ class AssessmentService {
           // Validate methods exist
           const validMethods = await Methods.findAll({
             where: { id: methodsIds, deletedAt: null },
-            transaction,
           });
 
           if (validMethods.length !== methodsIds.length) {
@@ -450,7 +447,6 @@ class AssessmentService {
       if (data.unit_ids) {
         try {
           const unitIds = data.unit_ids
-            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()))
             .filter(Boolean);
@@ -458,7 +454,6 @@ class AssessmentService {
           // Validate units exist
           const validUnits = await Units.findAll({
             where: { id: unitIds, deletedAt: null },
-            transaction,
           });
 
           if (validUnits.length !== unitIds.length) {
@@ -496,7 +491,6 @@ class AssessmentService {
       if (data.learner_id) {
         try {
           const learnerIds = data.learner_id
-            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()))
             .filter(Boolean);
@@ -504,7 +498,6 @@ class AssessmentService {
           // Validate learners exist
           const validLearners = await User.findAll({
             where: { id: learnerIds, deletedAt: null, role: Roles.LEARNER },
-            transaction,
           });
 
           if (validLearners.length !== learnerIds.length) {
@@ -540,17 +533,14 @@ class AssessmentService {
         }
       }
 
-      // Check if user is learner and update status if needed
       let isLearner_ = await User.findOne({
         where: { id: userData.id, role: Roles.LEARNER },
       });
-
       // Update Assessment
       // Check if login user is learner and have uploaded learner images then changes assessment_status
       if (learnerFiles && learnerFiles.length > 0 && isLearner_) {
         data.assessment_status = AssessmentStatus.LEARNER_AGREED;
       }
-
       try {
         await assessment.update(data, { transaction });
       } catch (updateError) {
@@ -562,19 +552,13 @@ class AssessmentService {
         };
       }
 
-      // Helper function for file processing
-      const processFiles = async (
-        files: any[],
-        entityType: string,
-        folder: string
-      ): Promise<number[]> => {
-        if (!files || files.length === 0) return [];
-
-        const fileIds = [];
-        const filePromises = files.map(async (file) => {
+      // Handle file uploads first
+      let fileIds = [];
+      if (files && files.length > 0) {
+        for (const file of files) {
           try {
             const extension = extname(file.originalname);
-            const mainFileName = `${folder}/${uuidv4()}${extension}`;
+            const mainFileName = `assessment/${uuidv4()}${extension}`;
             const fileUrl = await uploadFileOnAWS(file, mainFileName);
             const fileType = await this.getFileType(file.mimetype);
             const fileSize = file.size;
@@ -583,7 +567,42 @@ class AssessmentService {
             // Create File
             const fileCreated = await Image.create(
               {
-                entity_type: entityType,
+                entity_type: Entity.ASSESSMENT,
+                entity_id: assessment.id, // Remove + operator as assessment.id is already a number
+                image: fileUrl,
+                image_type: fileType,
+                image_name: fileName,
+                image_size: fileSize,
+              },
+              { transaction }
+            );
+            fileIds.push(fileCreated.id);
+          } catch (fileError) {
+            console.error("Error uploading file:", fileError);
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.SERVER_ERROR,
+              message: "Error uploading file",
+            };
+          }
+        }
+      }
+
+      // Handle file upload of learner
+      let learnerFileIds = [];
+      if (learnerFiles && learnerFiles.length > 0) {
+        for (const learnerFile of learnerFiles) {
+          try {
+            const extension = extname(learnerFile.originalname);
+            const mainFileName = `learner/${uuidv4()}${extension}`;
+            const fileUrl = await uploadFileOnAWS(learnerFile, mainFileName);
+            const fileType = await this.getFileType(learnerFile.mimetype);
+            const fileSize = learnerFile.size;
+            const fileName = learnerFile.originalname;
+            // Create Learner File
+            const fileCreated = await Image.create(
+              {
+                entity_type: Entity.LEARNER_ASSESSMENT,
                 entity_id: assessment.id,
                 image: fileUrl,
                 image_type: fileType,
@@ -592,46 +611,22 @@ class AssessmentService {
               },
               { transaction }
             );
-            return fileCreated.id;
-          } catch (fileError) {
-            console.error(`Error uploading ${folder} file:`, fileError);
-            throw fileError;
+            learnerFileIds.push(fileCreated.id);
+          } catch (error) {
+            console.log("Error uploading learner file:", error);
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.SERVER_ERROR,
+              message: "Error uploading learner file",
+            };
           }
-        });
-
-        try {
-          const results = await Promise.all(filePromises);
-          fileIds.push(...results);
-        } catch (error) {
-          throw error;
         }
-
-        return fileIds;
-      };
-
-      // Process files in parallel
-      let fileIds: number[] = [];
-      let learnerFileIds: number[] = [];
-
-      try {
-        [fileIds, learnerFileIds] = await Promise.all([
-          processFiles(files, Entity.ASSESSMENT, "assessment"),
-          processFiles(learnerFiles, Entity.LEARNER_ASSESSMENT, "learner"),
-        ]);
-      } catch (fileError) {
-        console.error("Error uploading files:", fileError);
-        await transaction.rollback();
-        return {
-          status: STATUS_CODES.SERVER_ERROR,
-          message: "Error uploading files",
-        };
       }
 
       // Handle file deletions - fix race condition
       if (data.delete_files) {
         try {
           const deleteFiles: number[] = data.delete_files
-            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()));
 
@@ -657,16 +652,14 @@ class AssessmentService {
           });
 
           // Delete files from AWS after database deletion
-          const deletePromises = imagesToDelete.map(async (image) => {
+          for (const image of imagesToDelete) {
             try {
               await deleteFileOnAWS(image.image);
             } catch (awsError) {
               console.error("Error deleting file from AWS:", awsError);
               // Continue with other deletions even if one fails
             }
-          });
-
-          await Promise.all(deletePromises);
+          }
         } catch (deleteError) {
           console.error("Error deleting files:", deleteError);
           await transaction.rollback();
@@ -724,16 +717,6 @@ class AssessmentService {
               },
               { transaction }
             );
-            // If update the assessment note then if user have uploaded files then update the assessment note files
-            if (fileIds.length > 0 && assessmentNote[0]) {
-              await AssessmentNoteFiles.bulkCreate(
-                fileIds.map((fid) => ({
-                  assessment_note_id: assessmentNote[0].id,
-                  file_id: fid,
-                })),
-                { transaction }
-              );
-            }
           } else {
             // Get current cycle or default to 1
             const currentCycle =
@@ -1617,7 +1600,7 @@ class AssessmentService {
           replacements: { learnerId },
           type: sequelize.QueryTypes.SELECT,
         }
-      );      
+      );
 
       let totalMarks_ = learnerTotalMarks[0].total_marks;
       let totalMaxMarks_ = learnerTotalMarks[0].total_max_marks;
@@ -1697,7 +1680,7 @@ class AssessmentService {
             replacements: { learnerId, unitId },
             type: sequelize.QueryTypes.SELECT,
           }
-        );        
+        );
 
         let unitEarned = parseFloat(unitMarks[0].total_marks);
 
