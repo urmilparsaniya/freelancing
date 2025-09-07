@@ -435,7 +435,7 @@ class qualificationService {
       }
       const latestMark = await AssessmentMarks.findOne({
         where: assessmentWhere,
-        order: [["createdAt", "DESC"]], // Get the most recent mark
+        order: [["marks", "DESC"]], // Get the most recent mark
         attributes: ["marks", "max_marks"]
       });
 
@@ -473,7 +473,7 @@ class qualificationService {
       // Get all assessment marks for this outcome, learner, and qualification
       const assessmentMarks = await AssessmentMarks.findOne({
         where: assessmentWhere,
-        order: [["attempt", "DESC"], ["createdAt", "DESC"]],
+        order: [["marks", "DESC"]],
         attributes: ["marks", "max_marks", "attempt"]
       })
 
