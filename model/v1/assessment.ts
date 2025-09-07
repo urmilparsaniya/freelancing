@@ -721,6 +721,15 @@ class AssessmentService {
               },
               { transaction }
             );
+            if (fileIds.length > 0 && assessmentNote[0]) {
+              await AssessmentNoteFiles.bulkCreate(
+                fileIds.map((fid) => ({
+                  assessment_note_id: assessmentNote[0].id,
+                  file_id: fid,
+                })),
+                { transaction }
+              );
+            }
           } else {
             // Get current cycle or default to 1
             const currentCycle =
