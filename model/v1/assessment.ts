@@ -99,6 +99,7 @@ class AssessmentService {
       if (data.method_ids) {
         try {
           const methodsIds = data.method_ids
+            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()))
             .filter(Boolean);
@@ -137,6 +138,7 @@ class AssessmentService {
       if (data.unit_ids) {
         try {
           const unitIds = data.unit_ids
+            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()))
             .filter(Boolean);
@@ -174,6 +176,7 @@ class AssessmentService {
       if (data.learner_id) {
         try {
           const learnerIds = data.learner_id
+            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()))
             .filter(Boolean);
@@ -382,6 +385,7 @@ class AssessmentService {
       if (data.method_ids) {
         try {
           const methodsIds = data.method_ids
+            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()))
             .filter(Boolean);
@@ -427,6 +431,7 @@ class AssessmentService {
       if (data.unit_ids) {
         try {
           const unitIds = data.unit_ids
+            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()))
             .filter(Boolean);
@@ -472,6 +477,7 @@ class AssessmentService {
       if (data.learner_id) {
         try {
           const learnerIds = data.learner_id
+            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()))
             .filter(Boolean);
@@ -602,6 +608,7 @@ class AssessmentService {
       if (data.delete_files) {
         try {
           const deleteFiles: number[] = data.delete_files
+            .toString()
             .split(",")
             .map((id) => parseInt(id.trim()));
 
@@ -903,6 +910,7 @@ class AssessmentService {
       }
       if (data.learner_id) {
         const learnerIds = data.learner_id
+          .toString()
           .split(",")
           .map((id) => parseInt(id.trim()))
           .filter(Boolean);
