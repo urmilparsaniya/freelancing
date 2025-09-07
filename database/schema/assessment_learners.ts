@@ -4,6 +4,7 @@ const { sequelize } = require("../../configs/database");
 import BaseModel from "./base";
 import { TABLE_NAME } from "../../configs/tables";
 import { AssessmentLearnerInterface } from "../../interface/assessment_learner";
+import Assessment from "./assessment";
 
 class AssessmentLearner
   extends Model<AssessmentLearnerInterface>
@@ -41,5 +42,11 @@ AssessmentLearner.init(
     tableName: TABLE_NAME.ASSESSMENT_LEARNER,
   }
 );
+
+AssessmentLearner.hasOne(Assessment, {
+  foreignKey: "id",
+  sourceKey: "assessment_id",
+  as: "assessment"
+})
 
 export default AssessmentLearner

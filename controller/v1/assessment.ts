@@ -137,6 +137,27 @@ class assessmentController {
       res.handler.serverError(error);
     }
   }
+
+  // Statistics
+  static async statistics(req: Request, res: Response): Promise<void> {
+    try {
+      let userData = req.headers["user_info"] as userAuthenticationData;
+      let data = req.query
+      let request = await AssessmentService.statistics(data, userData);
+      if (request.status !== STATUS_CODES.SUCCESS) {
+        res.handler.errorResponse(request.status, request.message);
+        return;
+      }
+      res.handler.successResponse(
+        request.status,
+        request.data,
+        request.message
+      );
+    } catch (error) {
+      error = "server error";
+      res.handler.serverError(error);
+    }
+  }
 }
 
 export default assessmentController;

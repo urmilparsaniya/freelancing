@@ -50,4 +50,9 @@ router
   .route("/update-status/:id")
   .put(authenticateUser, assessmentController.updateAssessmentStatus);
 
+// Statistics
+router
+  .route("/statistics")
+  .get(authenticateUser, assessmentController.statistics);
+
 export default router;

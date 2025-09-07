@@ -37,6 +37,8 @@ import AssessmentLearner from "../../database/schema/assessment_learners";
 import AssessmentNotes from "../../database/schema/assessment_notes";
 import AssessmentNoteFiles from "../../database/schema/assessment_note_files";
 import AssessmentMarks from "../../database/schema/assessment_marks";
+import SubOutcomes from "../../database/schema/sub_outcomes";
+import OutcomeSubpoints from "../../database/schema/outcome_subpoints";
 
 class AssessmentService {
   /**
@@ -44,19 +46,30 @@ class AssessmentService {
    * Workflow Phase Logic:
    * - Phase 0: Initial assessment creation, assessor completion, assessor rejection
    * - Phase 1: IQA disagreement, assessor response to IQA disagreement
-   * 
+   *
    * @param assessmentStatus - Current assessment status
    * @param userRole - Role of the user creating/updating the note
    * @param previousStatus - Previous assessment status (for context)
    * @returns workflow phase number (0 or 1)
    */
-  static getWorkflowPhase(assessmentStatus: number, userRole: number, previousStatus?: number): number {
+  static getWorkflowPhase(
+    assessmentStatus: number,
+    userRole: number,
+    previousStatus?: number
+  ): number {
     // IQA disagreed with comment = stage - 1 - status - 5
-    if (+assessmentStatus === +AssessmentStatus.NOT_AGREED_BY_IQA && +userRole === +Roles.IQA) {
+    if (
+      +assessmentStatus === +AssessmentStatus.NOT_AGREED_BY_IQA &&
+      +userRole === +Roles.IQA
+    ) {
       return 1;
     }
     // Assessor comment and completed = stage - 1 - check if old status is 5 then stage set to 1 and it's assessor - status - 4
-    if (+assessmentStatus === +AssessmentStatus.ASSESSMENT_COMPLETED && +userRole === +Roles.ASSESSOR && +previousStatus === +AssessmentStatus.NOT_AGREED_BY_IQA) {
+    if (
+      +assessmentStatus === +AssessmentStatus.ASSESSMENT_COMPLETED &&
+      +userRole === +Roles.ASSESSOR &&
+      +previousStatus === +AssessmentStatus.NOT_AGREED_BY_IQA
+    ) {
       return 1;
     }
     // Default workflow phase for initial creation and other cases
@@ -272,14 +285,14 @@ class AssessmentService {
        */
       if (data.assessment_note) {
         try {
-          const uploadedBy = RoleRoleSlug[userData.role]
+          const uploadedBy = RoleRoleSlug[userData.role];
           const assessmentNoteData = {
             assessment_id: assessment.id,
             user_id: userData_.id,
             uploaded_by: uploadedBy,
             feedback: data.assessment_note,
             is_main_assessment_note: true,
-            status: AssessmentStatus.ASSESSMENT_CREATE
+            status: AssessmentStatus.ASSESSMENT_CREATE,
           };
           let assessmentNote = await AssessmentNotes.create(
             assessmentNoteData,
@@ -358,7 +371,15 @@ class AssessmentService {
       let userData_ = await User.findOne({
         where: {
           id: userData.id,
-          role: { [Op.in]: [Roles.ADMIN, Roles.ASSESSOR, Roles.LEARNER, Roles.IQA, Roles.EQA] },
+          role: {
+            [Op.in]: [
+              Roles.ADMIN,
+              Roles.ASSESSOR,
+              Roles.LEARNER,
+              Roles.IQA,
+              Roles.EQA,
+            ],
+          },
         },
       });
       if (!userData_) {
@@ -369,7 +390,7 @@ class AssessmentService {
             "Only Admins, Assessors and IQA are allowed to update assessments.",
         };
       }
-      
+
       let assessment = await Assessment.findByPk(assessmentId);
       if (!assessment) {
         await transaction.rollback();
@@ -378,8 +399,6 @@ class AssessmentService {
           message: "Assessment not found",
         };
       }
-
-
 
       // Update Assessment Methods
       if (data.method_ids) {
@@ -525,13 +544,13 @@ class AssessmentService {
       let isLearner_ = await User.findOne({
         where: { id: userData.id, role: Roles.LEARNER },
       });
-      
+
       // Update Assessment
       // Check if login user is learner and have uploaded learner images then changes assessment_status
       if (learnerFiles && learnerFiles.length > 0 && isLearner_) {
         data.assessment_status = AssessmentStatus.LEARNER_AGREED;
       }
-      
+
       try {
         await assessment.update(data, { transaction });
       } catch (updateError) {
@@ -544,9 +563,13 @@ class AssessmentService {
       }
 
       // Helper function for file processing
-      const processFiles = async (files: any[], entityType: string, folder: string): Promise<number[]> => {
+      const processFiles = async (
+        files: any[],
+        entityType: string,
+        folder: string
+      ): Promise<number[]> => {
         if (!files || files.length === 0) return [];
-        
+
         const fileIds = [];
         const filePromises = files.map(async (file) => {
           try {
@@ -589,11 +612,11 @@ class AssessmentService {
       // Process files in parallel
       let fileIds: number[] = [];
       let learnerFileIds: number[] = [];
-      
+
       try {
         [fileIds, learnerFileIds] = await Promise.all([
           processFiles(files, Entity.ASSESSMENT, "assessment"),
-          processFiles(learnerFiles, Entity.LEARNER_ASSESSMENT, "learner")
+          processFiles(learnerFiles, Entity.LEARNER_ASSESSMENT, "learner"),
         ]);
       } catch (fileError) {
         console.error("Error uploading files:", fileError);
@@ -642,7 +665,7 @@ class AssessmentService {
               // Continue with other deletions even if one fails
             }
           });
-          
+
           await Promise.all(deletePromises);
         } catch (deleteError) {
           console.error("Error deleting files:", deleteError);
@@ -660,14 +683,19 @@ class AssessmentService {
           const assessmentNote = await AssessmentNotes.findAll({
             where: { assessment_id: assessment.id },
             order: [
-              ['cycle', 'DESC'],
-              ['updatedAt', 'DESC']
-            ]
+              ["cycle", "DESC"],
+              ["updatedAt", "DESC"],
+            ],
           });
 
           // Helper function to create assessment note with files
-          const createAssessmentNoteWithFiles = async (noteData: any, fileIds: number[]) => {
-            const newNote = await AssessmentNotes.create(noteData, { transaction });
+          const createAssessmentNoteWithFiles = async (
+            noteData: any,
+            fileIds: number[]
+          ) => {
+            const newNote = await AssessmentNotes.create(noteData, {
+              transaction,
+            });
             if (fileIds.length > 0 && newNote) {
               await AssessmentNoteFiles.bulkCreate(
                 fileIds.map((fid) => ({
@@ -681,38 +709,51 @@ class AssessmentService {
           };
 
           // Check if assessment note is main assessment note then update it
-          if (assessmentNote.length == 1 && assessmentNote[0].is_main_assessment_note && userData_.role == Roles.ASSESSOR) {
-            await assessmentNote[0].update({
-              feedback: data.assessment_note,
-              workflow_phase: this.getWorkflowPhase(data.assessment_status || assessment.assessment_status, userData_.role)
-            }, { transaction });
+          if (
+            assessmentNote.length == 1 &&
+            assessmentNote[0].is_main_assessment_note &&
+            userData_.role == Roles.ASSESSOR
+          ) {
+            await assessmentNote[0].update(
+              {
+                feedback: data.assessment_note,
+                workflow_phase: this.getWorkflowPhase(
+                  data.assessment_status || assessment.assessment_status,
+                  userData_.role
+                ),
+              },
+              { transaction }
+            );
           } else {
             // Get current cycle or default to 1
-            const currentCycle = assessmentNote.length > 0 ? assessmentNote[0].cycle : 0;
-            
+            const currentCycle =
+              assessmentNote.length > 0 ? assessmentNote[0].cycle : 0;
+
             // Get previous status for workflow phase calculation
-            const previousStatus = assessmentNote.length > 0 ? assessmentNote[0].status : null;
-            
+            const previousStatus =
+              assessmentNote.length > 0 ? assessmentNote[0].status : null;
+
             // Define role-specific configurations
             const roleConfigs = {
               [Roles.LEARNER]: {
                 uploaded_by: RoleSlug.LEARNER,
                 cycle: currentCycle + 1,
-                status: data.assessment_status || AssessmentStatus.LEARNER_AGREED,
-                fileIds: learnerFileIds
+                status:
+                  data.assessment_status || AssessmentStatus.LEARNER_AGREED,
+                fileIds: learnerFileIds,
               },
               [Roles.ASSESSOR]: {
                 uploaded_by: RoleSlug.ASSESSOR,
                 cycle: currentCycle,
                 status: data.assessment_status,
-                fileIds: fileIds
+                fileIds: fileIds,
               },
               [Roles.IQA]: {
                 uploaded_by: RoleSlug.IQA,
                 cycle: currentCycle,
                 status: data.assessment_status,
-                fileIds: fileIds
-              }
+                fileIds: fileIds,
+              },
             };
 
             const config = roleConfigs[userData_.role];
@@ -725,10 +766,17 @@ class AssessmentService {
                 is_main_assessment_note: false,
                 cycle: config.cycle,
                 status: config.status,
-                workflow_phase: this.getWorkflowPhase(config.status, userData_.role, previousStatus)
+                workflow_phase: this.getWorkflowPhase(
+                  config.status,
+                  userData_.role,
+                  previousStatus
+                ),
               };
 
-              await createAssessmentNoteWithFiles(assessmentNoteData, config.fileIds);
+              await createAssessmentNoteWithFiles(
+                assessmentNoteData,
+                config.fileIds
+              );
             }
           }
         } catch (error) {
@@ -742,20 +790,28 @@ class AssessmentService {
       }
 
       // Check if Assessor rejected the assessment
-      if (userData_.role === Roles.ASSESSOR && data.assessment_status === AssessmentStatus.ASSESSOR_REJECT) {
+      if (
+        userData_.role === Roles.ASSESSOR &&
+        data.assessment_status === AssessmentStatus.ASSESSOR_REJECT
+      ) {
         try {
           // Delete all assessment mark entries for this assessment
           const deletedMarks = await AssessmentMarks.destroy({
             where: {
-              assessment_id: assessment.id
+              assessment_id: assessment.id,
             },
             force: true, // Hard delete
-            transaction
+            transaction,
           });
-          
-          console.log(`Deleted ${deletedMarks} assessment mark entries due to IQA rejection`);
+
+          console.log(
+            `Deleted ${deletedMarks} assessment mark entries due to IQA rejection`
+          );
         } catch (error) {
-          console.error("Error deleting assessment marks after IQA rejection:", error);
+          console.error(
+            "Error deleting assessment marks after IQA rejection:",
+            error
+          );
           await transaction.rollback();
           return {
             status: STATUS_CODES.SERVER_ERROR,
@@ -768,19 +824,25 @@ class AssessmentService {
       if (data.assessment_mark) {
         try {
           let marksData = data.assessment_mark;
-          if (typeof marksData === 'string') {
+          if (typeof marksData === "string") {
             // marksData = JSON.parse(marksData);
           }
-          
+
           // Basic validation for required parameters
-          if (!marksData.assessment_id || !marksData.learner_id || !marksData.marks || !Array.isArray(marksData.marks)) {
+          if (
+            !marksData.assessment_id ||
+            !marksData.learner_id ||
+            !marksData.marks ||
+            !Array.isArray(marksData.marks)
+          ) {
             await transaction.rollback();
             return {
               status: STATUS_CODES.BAD_REQUEST,
-              message: "Assessment mark data is missing required parameters: assessment_id, learner_id, and marks array",
+              message:
+                "Assessment mark data is missing required parameters: assessment_id, learner_id, and marks array",
             };
           }
-          
+
           // Process each mark entry
           for (const markEntry of marksData.marks) {
             const {
@@ -789,7 +851,7 @@ class AssessmentService {
               main_outcome_id,
               sub_outcome_id,
               subpoint_id,
-              marks
+              marks,
             } = markEntry;
 
             // Check if marks already exist for this specific criteria to determine attempt number
@@ -802,24 +864,27 @@ class AssessmentService {
                 main_outcome_id: main_outcome_id || null,
                 sub_outcome_id: sub_outcome_id || null,
                 subpoint_id: subpoint_id || null,
-                deletedAt: null
+                deletedAt: null,
               },
-              order: [['attempt', 'DESC']],
-              transaction
+              order: [["attempt", "DESC"]],
+              transaction,
             });
 
             if (existingMarks) {
               // Update the existing record
-              await existingMarks.update({
-                marks: marks.toString(),
-                assessor_id: userData_.id
-              }, { transaction });
+              await existingMarks.update(
+                {
+                  marks: marks.toString(),
+                  assessor_id: userData_.id,
+                },
+                { transaction }
+              );
             } else {
               // Calculate attempt number - if marks exist, increment by 1, otherwise start with 1
               const attemptNumber = existingMarks
                 ? (parseInt(existingMarks.attempt) + 1).toString()
                 : "1";
-              
+
               // Create new mark entry with proper attempt number
               await AssessmentMarks.create(
                 {
@@ -839,7 +904,9 @@ class AssessmentService {
               );
             }
           }
-          console.log(`Successfully processed ${marksData.marks.length} mark entries for assessment ${marksData.assessment_id}, learner ${marksData.learner_id}`);
+          console.log(
+            `Successfully processed ${marksData.marks.length} mark entries for assessment ${marksData.assessment_id}, learner ${marksData.learner_id}`
+          );
         } catch (error) {
           console.error("Error updating assessment mark:", error);
           await transaction.rollback();
@@ -884,15 +951,19 @@ class AssessmentService {
       let whereCondition: any = {
         deletedAt: null,
       };
-      
+
       // Check login user is IQA
       let isIqa = await User.findOne({
         where: { id: userData.id, role: Roles.IQA },
       });
       if (isIqa) {
         whereCondition.assessment_status = {
-          [Op.in]: [AssessmentStatus.NOT_AGREED_BY_IQA, AssessmentStatus.AGREED_BY_IQA, AssessmentStatus.ASSESSMENT_COMPLETED]
-        }
+          [Op.in]: [
+            AssessmentStatus.NOT_AGREED_BY_IQA,
+            AssessmentStatus.AGREED_BY_IQA,
+            AssessmentStatus.ASSESSMENT_COMPLETED,
+          ],
+        };
       }
 
       let learnerWhereCondition: any = {
@@ -1005,7 +1076,7 @@ class AssessmentService {
       });
 
       assessment_ = JSON.parse(JSON.stringify(assessment_));
-      
+
       const pagination = await paginate(assessment_, limit, page, fetchAll);
       const response = {
         data: assessment_.rows,
@@ -1037,7 +1108,7 @@ class AssessmentService {
       let evidenceWhereCondition: any = {
         deletedAt: null,
       };
-      
+
       // Filter assessment notes based on user role and workflow phase
       if (user && user.role === Roles.LEARNER) {
         // Learners can only see assessment notes with workflow_phase = 0
@@ -1050,7 +1121,7 @@ class AssessmentService {
         // Assessors can see all assessment notes (no filtering)
         // Assessors need to see all phases to respond appropriately
       }
-      
+
       let assessment: any = await Assessment.findByPk(assessmentId, {
         include: [
           {
@@ -1098,36 +1169,44 @@ class AssessmentService {
                 as: "user",
                 required: false,
                 attributes: ["id", "name", "surname"],
-              }
+              },
             ],
-          }
+          },
         ],
         order: [
-          [{ model: AssessmentNotes, as: "evidence_cycles" }, "id", "DESC"]
-        ]
+          [{ model: AssessmentNotes, as: "evidence_cycles" }, "id", "DESC"],
+        ],
       });
 
       assessment = JSON.parse(JSON.stringify(assessment));
 
-      let learner_comment = false
-      let assessor_comment = false
+      let learner_comment = false;
+      let assessor_comment = false;
 
       if (assessment) {
-        if (assessment.assessment_status == AssessmentStatus.ASSESSMENT_CREATE) {
-          learner_comment = true
-          assessor_comment = true
-        } else if (assessment.assessment_status == AssessmentStatus.LEARNER_AGREED) {
-          learner_comment = false
-          assessor_comment = true
-        } else if (assessment.assessment_status == AssessmentStatus.ASSESSMENT_COMPLETED) {
-          learner_comment = false
-          assessor_comment = false
-        } else if (assessment.assessment_status == AssessmentStatus.ASSESSOR_REJECT) {
-          learner_comment = true
-          assessor_comment = false
+        if (
+          assessment.assessment_status == AssessmentStatus.ASSESSMENT_CREATE
+        ) {
+          learner_comment = true;
+          assessor_comment = true;
+        } else if (
+          assessment.assessment_status == AssessmentStatus.LEARNER_AGREED
+        ) {
+          learner_comment = false;
+          assessor_comment = true;
+        } else if (
+          assessment.assessment_status == AssessmentStatus.ASSESSMENT_COMPLETED
+        ) {
+          learner_comment = false;
+          assessor_comment = false;
+        } else if (
+          assessment.assessment_status == AssessmentStatus.ASSESSOR_REJECT
+        ) {
+          learner_comment = true;
+          assessor_comment = false;
         }
-        assessment.learner_comment = learner_comment
-        assessment.assessor_comment = assessor_comment
+        assessment.learner_comment = learner_comment;
+        assessment.assessor_comment = assessor_comment;
       }
 
       return {
@@ -1204,11 +1283,11 @@ class AssessmentService {
         transaction,
       });
 
-      // Delete Assessment Notes 
+      // Delete Assessment Notes
       let assessmentNotes = await AssessmentNotes.findAll({
         where: { assessment_id: assessment.id },
-        attributes: ["id"]
-      })
+        attributes: ["id"],
+      });
       let assessmentNoteIds = assessmentNotes.map(
         (assessmentIds) => assessmentIds.id
       );
@@ -1217,7 +1296,7 @@ class AssessmentService {
         await AssessmentNoteFiles.destroy({
           where: { assessment_note_id: { [Op.in]: assessmentNoteIds } },
           transaction,
-          force: true
+          force: true,
         });
       }
 
@@ -1290,7 +1369,7 @@ class AssessmentService {
 
       // Update only if valid
       assessment.assessment_status = newStatus;
-      assessment.feedback = data.feedback
+      assessment.feedback = data.feedback;
       await assessment.save({ transaction });
 
       // if (data.assessment_note) {
@@ -1326,7 +1405,7 @@ class AssessmentService {
       //           );
       //         }
       //       }
-      //       // Now need to check if API call came from assessor then need to create new assessment note but cycle number is same 
+      //       // Now need to check if API call came from assessor then need to create new assessment note but cycle number is same
       //       if (userData_.role == Roles.ASSESSOR) {
       //         let assessmentNoteData = {
       //           assessment_id: assessment.id,
@@ -1394,7 +1473,10 @@ class AssessmentService {
       let hasAccess = false;
       if (userData.role === Roles.ADMIN) {
         hasAccess = true;
-      } else if (userData.role === Roles.ASSESSOR && assessment.assessor_id === userData.id) {
+      } else if (
+        userData.role === Roles.ASSESSOR &&
+        assessment.assessor_id === userData.id
+      ) {
         hasAccess = true;
       } else if (userData.role === Roles.IQA) {
         // IQA can access assessments in their center
@@ -1402,7 +1484,10 @@ class AssessmentService {
         if (user && user.center_id === assessment.center_id) {
           hasAccess = true;
         }
-      } else if (userData.role === Roles.LEARNER && parseInt(learnerId) === userData.id) {
+      } else if (
+        userData.role === Roles.LEARNER &&
+        parseInt(learnerId) === userData.id
+      ) {
         // Learner can only see their own marks
         hasAccess = true;
       }
@@ -1419,29 +1504,29 @@ class AssessmentService {
         where: {
           assessment_id: assessmentId,
           learner_id: learnerId,
-          deletedAt: null
+          deletedAt: null,
         },
         include: [
           {
             model: Qualifications,
             as: "qualification",
             required: false,
-            attributes: ["id", "name", "qualification_no"]
+            attributes: ["id", "name", "qualification_no"],
           },
           {
             model: Units,
             as: "unit",
             required: false,
-            attributes: ["id", "name", "unit_code"]
-          }
+            attributes: ["id", "name", "unit_code"],
+          },
         ],
         order: [
           ["qualification_id", "ASC"],
           ["unit_id", "ASC"],
           ["main_outcome_id", "ASC"],
           ["sub_outcome_id", "ASC"],
-          ["subpoint_id", "ASC"]
-        ]
+          ["subpoint_id", "ASC"],
+        ],
       });
 
       return {
@@ -1449,12 +1534,203 @@ class AssessmentService {
         data: {
           assessment_id: assessmentId,
           learner_id: learnerId,
-          marks: marks
+          marks: marks,
         },
         message: "Assessment marks retrieved successfully",
       };
     } catch (error) {
       console.error("Error retrieving assessment marks:", error);
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: "Server error",
+      };
+    }
+  }
+
+  // Statistics
+  static async statistics(
+    data,
+    userData: userAuthenticationData
+  ): Promise<any> {
+    try {
+      let learnerId = data.learner_id;
+
+      // Check if login user is learner
+      const isLearner = await User.findOne({
+        where: { id: userData.id, role: Roles.LEARNER },
+      });
+      if (isLearner) {
+        learnerId = isLearner.id;
+      }
+
+      if (!learnerId) {
+        return {
+          status: STATUS_CODES.BAD_REQUEST,
+          message: "Learner id is required",
+        };
+      }
+
+      // Fetch all marks ordered by latest first
+      const assessmentMarks = await AssessmentMarks.findAll({
+        where: { learner_id: learnerId, deletedAt: null },
+        order: [["createdAt", "DESC"]],
+      });
+
+      const learnerTotalMarks = await sequelize.query(
+        `
+        SELECT 
+            COALESCE(SUM(am.marks), 0) AS total_marks,
+            COALESCE(SUM(am.max_marks), 0) AS total_max_marks
+        FROM tbl_assessment_marks am
+        INNER JOIN (
+            SELECT 
+                learner_id,
+                qualification_id,
+                unit_id,
+                sub_outcome_id,
+                COALESCE(subpoint_id, -1) AS subpoint_group,
+                MAX(createdAt) AS latest_created
+            FROM tbl_assessment_marks
+            WHERE learner_id = :learnerId 
+              AND deletedAt IS NULL
+            GROUP BY learner_id, qualification_id, unit_id, sub_outcome_id, COALESCE(subpoint_id, -1)
+        ) latest 
+          ON am.learner_id = latest.learner_id
+         AND am.qualification_id = latest.qualification_id
+         AND am.unit_id = latest.unit_id
+         AND am.sub_outcome_id = latest.sub_outcome_id
+         AND COALESCE(am.subpoint_id, -1) = latest.subpoint_group
+         AND am.createdAt = latest.latest_created
+        WHERE am.deletedAt IS NULL
+      `,
+        {
+          replacements: { learnerId },
+          type: sequelize.QueryTypes.SELECT,
+        }
+      );
+
+      let totalMarks_ = learnerTotalMarks[0].total_marks;
+      let totalMaxMarks_ = learnerTotalMarks[0].total_max_marks;
+
+      // Extract Total units assigned to learner and remove duplicate units
+      const totalUnitsInArray = assessmentMarks.map((mark) => mark.unit_id);
+      const totalUnits = [...new Set(totalUnitsInArray)];
+
+      // Get total units sub outcomes and sub points default marks
+      const totalUnitsSubOutcomes = await SubOutcomes.findAll({
+        where: { unit_id: { [Op.in]: totalUnits }, deletedAt: null },
+        attributes: ["id", "marks", "unit_id"],
+      });
+      const totalUnitsSubOutcomesInArray = totalUnitsSubOutcomes.map(
+        (outcome) => outcome.id
+      );
+      const totalUnitsSubPoints = await OutcomeSubpoints.findAll({
+        where: {
+          outcome_id: { [Op.in]: totalUnitsSubOutcomesInArray },
+          deletedAt: null,
+        },
+        attributes: ["id", "marks", "outcome_id"],
+      });
+
+      let totalSubPointsMarks = totalUnitsSubPoints.reduce(
+        (acc, curr) => acc + parseFloat(curr.marks),
+        0
+      );
+      let totalSubOutcomesMarks = totalUnitsSubOutcomes.reduce(
+        (acc, curr) => acc + parseFloat(curr.marks),
+        0
+      );
+      let totalMarksPossible = totalSubPointsMarks + totalSubOutcomesMarks;
+
+      // Calculate total progress of learner in percentage from total marks and given marks by assessor
+      // Calculate progress %
+      let progressPercentage = 0.0;
+      if (totalMarksPossible > 0) {
+        progressPercentage = Number(
+          ((totalMarks_ / totalMarksPossible) * 100).toFixed(2)
+        );
+      }
+      // ---- Unit-specific progress ----
+      let unitsProgress: any[] = [];
+
+      for (const unitId of totalUnits) {
+        // Earned marks for this unit
+        const unitMarks = await sequelize.query(
+          `
+        SELECT 
+            COALESCE(SUM(am.marks), 0) AS total_marks,
+            COALESCE(SUM(am.max_marks), 0) AS total_max_marks
+        FROM tbl_assessment_marks am
+        INNER JOIN (
+            SELECT 
+                learner_id,
+                qualification_id,
+                unit_id,
+                sub_outcome_id,
+                COALESCE(subpoint_id, -1) AS subpoint_group,
+                MAX(createdAt) AS latest_created
+            FROM tbl_assessment_marks
+            WHERE learner_id = :learnerId 
+              AND unit_id = :unitId
+              AND deletedAt IS NULL
+            GROUP BY learner_id, qualification_id, unit_id, sub_outcome_id, COALESCE(subpoint_id, -1)
+        ) latest 
+          ON am.learner_id = latest.learner_id
+         AND am.qualification_id = latest.qualification_id
+         AND am.unit_id = latest.unit_id
+         AND am.sub_outcome_id = latest.sub_outcome_id
+         AND COALESCE(am.subpoint_id, -1) = latest.subpoint_group
+         AND am.createdAt = latest.latest_created
+        WHERE am.deletedAt IS NULL
+      `,
+          {
+            replacements: { learnerId, unitId },
+            type: sequelize.QueryTypes.SELECT,
+          }
+        );
+
+        let unitEarned = parseFloat(unitMarks[0].total_marks);
+
+        // Possible marks for this unit
+        let unitOutcomes = totalUnitsSubOutcomes.filter(
+          (o) => o.unit_id === unitId
+        );
+        let unitOutcomeIds = unitOutcomes.map((o) => o.id);
+
+        let unitSubpoints = totalUnitsSubPoints.filter((sp) =>
+          unitOutcomeIds.includes(sp.outcome_id)
+        );
+
+        let unitPossible =
+          unitOutcomes.reduce((acc, o) => acc + parseFloat(o.marks), 0) +
+          unitSubpoints.reduce((acc, sp) => acc + parseFloat(sp.marks), 0);
+
+        let unitProgress = 0;
+        if (unitPossible > 0) {
+          unitProgress = Number(((unitEarned / unitPossible) * 100).toFixed(2));
+        }
+
+        unitsProgress.push({
+          unit_id: unitId,
+          earned_marks: unitEarned,
+          total_possible_marks: unitPossible,
+          progress_percentage: unitProgress,
+        });
+      }
+      return {
+        status: STATUS_CODES.SUCCESS,
+        data: {
+          earned_marks: totalMarks_,
+          earned_max_marks: totalMaxMarks_,
+          total_possible_marks: totalMarksPossible,
+          progress_percentage: progressPercentage,
+          total_units: totalUnits.length,
+          units_progress: unitsProgress,
+        },
+        message: "Statistics fetched successfully",
+      };
+    } catch (error) {
+      console.error("Error fetching statistics:", error);
       return {
         status: STATUS_CODES.SERVER_ERROR,
         message: "Server error",
