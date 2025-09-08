@@ -1718,13 +1718,14 @@ class AssessmentService {
 
         // Get the unit details to include unit_number in response
         const unitDetails = await Units.findByPk(unitId, {
-          attributes: ['id', 'unit_number', 'unit_title'],
+          attributes: ['id', 'unit_number', 'unit_title', 'qualification_id'],
         });
         
         unitsProgress.push({
           unit_id: unitId,
           unit_number: unitDetails ? unitDetails.unit_number : null,
           unit_title: unitDetails ? unitDetails.unit_title : null,
+          qualification_id: unitDetails ? unitDetails.qualification_id : null,
           earned_marks: unitEarned,
           total_possible_marks: unitPossible,
           progress_percentage: unitProgress,
