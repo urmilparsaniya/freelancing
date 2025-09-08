@@ -1316,6 +1316,13 @@ class AssessmentService {
       // Soft delete the assessment
       await assessment.destroy({ force: true, transaction });
 
+      // Delete Assessment Marks
+      await AssessmentMarks.destroy({
+        where: { assessment_id: assessment.id },
+        force: true,
+        transaction,
+      });
+
       await transaction.commit();
       return {
         status: STATUS_CODES.SUCCESS,
@@ -1560,6 +1567,7 @@ class AssessmentService {
   ): Promise<any> {
     try {
       let learnerId = data.learner_id;
+      let qualification_id = data.qualification_id;
 
       // Check if login user is learner
       const isLearner = await User.findOne({
@@ -1576,9 +1584,17 @@ class AssessmentService {
         };
       }
 
+      let assessmentWhereCondition: any = {
+        deletedAt: null,
+        learner_id: learnerId,
+      };
+      if (qualification_id) {
+        assessmentWhereCondition.qualification_id = qualification_id;
+      }
+
       // Fetch all marks ordered by latest first
       const assessmentMarks = await AssessmentMarks.findAll({
-        where: { learner_id: learnerId, deletedAt: null },
+        where: assessmentWhereCondition,
         order: [["createdAt", "DESC"]],
       });
 
@@ -1597,7 +1613,8 @@ class AssessmentService {
                 COALESCE(subpoint_id, -1) AS subpoint_group,
                 MAX(marks) AS best_marks
             FROM tbl_assessment_marks
-            WHERE learner_id = :learnerId 
+            WHERE learner_id = :learnerId
+              AND qualification_id = :qualificationId
               AND deletedAt IS NULL
             GROUP BY learner_id, qualification_id, unit_id, sub_outcome_id, COALESCE(subpoint_id, -1)
         ) best
@@ -1610,7 +1627,7 @@ class AssessmentService {
         WHERE am.deletedAt IS NULL
         `,
         {
-          replacements: { learnerId },
+          replacements: { learnerId, qualification_id },
           type: sequelize.QueryTypes.SELECT,
         }
       );
@@ -1677,6 +1694,7 @@ class AssessmentService {
                   MAX(marks) AS best_marks
               FROM tbl_assessment_marks
               WHERE learner_id = :learnerId 
+                AND qualification_id = :qualificationId
                 AND unit_id = :unitId
                 AND deletedAt IS NULL
               GROUP BY learner_id, qualification_id, unit_id, sub_outcome_id, COALESCE(subpoint_id, -1)
@@ -1690,7 +1708,7 @@ class AssessmentService {
           WHERE am.deletedAt IS NULL
           `,
           {
-            replacements: { learnerId, unitId },
+            replacements: { learnerId, qualification_id, unitId },
             type: sequelize.QueryTypes.SELECT,
           }
         );
