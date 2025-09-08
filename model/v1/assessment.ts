@@ -1614,7 +1614,6 @@ class AssessmentService {
                 MAX(marks) AS best_marks
             FROM tbl_assessment_marks
             WHERE learner_id = :learnerId
-              AND qualification_id = :qualificationId
               AND deletedAt IS NULL
             GROUP BY learner_id, qualification_id, unit_id, sub_outcome_id, COALESCE(subpoint_id, -1)
         ) best
@@ -1627,7 +1626,7 @@ class AssessmentService {
         WHERE am.deletedAt IS NULL
         `,
         {
-          replacements: { learnerId, qualificationId: qualification_id },
+          replacements: { learnerId },
           type: sequelize.QueryTypes.SELECT,
         }
       );
@@ -1694,7 +1693,6 @@ class AssessmentService {
                   MAX(marks) AS best_marks
               FROM tbl_assessment_marks
               WHERE learner_id = :learnerId 
-                AND qualification_id = :qualificationId
                 AND unit_id = :unitId
                 AND deletedAt IS NULL
               GROUP BY learner_id, qualification_id, unit_id, sub_outcome_id, COALESCE(subpoint_id, -1)
@@ -1708,7 +1706,7 @@ class AssessmentService {
           WHERE am.deletedAt IS NULL
           `,
           {
-            replacements: { learnerId, qualificationId: qualification_id, unitId },
+            replacements: { learnerId, unitId },
             type: sequelize.QueryTypes.SELECT,
           }
         );
