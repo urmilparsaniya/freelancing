@@ -1716,8 +1716,15 @@ class AssessmentService {
           unitProgress = Number(((unitEarned / unitPossible) * 100).toFixed(2));
         }
 
+        // Get the unit details to include unit_number in response
+        const unitDetails = await Units.findByPk(unitId, {
+          attributes: ['id', 'unit_number', 'unit_title'],
+        });
+        
         unitsProgress.push({
           unit_id: unitId,
+          unit_number: unitDetails ? unitDetails.unit_number : null,
+          unit_title: unitDetails ? unitDetails.unit_title : null,
           earned_marks: unitEarned,
           total_possible_marks: unitPossible,
           progress_percentage: unitProgress,
