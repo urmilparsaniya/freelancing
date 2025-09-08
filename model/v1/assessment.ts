@@ -1627,7 +1627,7 @@ class AssessmentService {
         WHERE am.deletedAt IS NULL
         `,
         {
-          replacements: { learnerId, qualification_id },
+          replacements: { learnerId, qualificationId: qualification_id },
           type: sequelize.QueryTypes.SELECT,
         }
       );
@@ -1708,7 +1708,7 @@ class AssessmentService {
           WHERE am.deletedAt IS NULL
           `,
           {
-            replacements: { learnerId, qualification_id, unitId },
+            replacements: { learnerId, qualificationId: qualification_id, unitId },
             type: sequelize.QueryTypes.SELECT,
           }
         );
