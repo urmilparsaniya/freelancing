@@ -1598,6 +1598,14 @@ class AssessmentService {
         order: [["createdAt", "DESC"]],
       });
 
+      let qualificationCondition = "";
+      let replacements: any = { learnerId };
+
+      if (qualification_id) {
+        qualificationCondition = "AND qualification_id = :qualification_id";
+        replacements.qualification_id = qualification_id;
+      }
+
       const learnerTotalMarks = await sequelize.query(
         `
         SELECT 
@@ -1614,6 +1622,7 @@ class AssessmentService {
                 MAX(marks) AS best_marks
             FROM tbl_assessment_marks
             WHERE learner_id = :learnerId
+              ${qualificationCondition}
               AND deletedAt IS NULL
             GROUP BY learner_id, qualification_id, unit_id, sub_outcome_id, COALESCE(subpoint_id, -1)
         ) best
@@ -1625,10 +1634,7 @@ class AssessmentService {
          AND am.marks = best.best_marks
         WHERE am.deletedAt IS NULL
         `,
-        {
-          replacements: { learnerId },
-          type: sequelize.QueryTypes.SELECT,
-        }
+        { replacements, type: sequelize.QueryTypes.SELECT }
       );
 
       let totalMarks_ = learnerTotalMarks[0].total_marks;
@@ -1677,36 +1683,46 @@ class AssessmentService {
 
       for (const unitId of totalUnits) {
         // Earned marks for this unit
+        let unitQualificationCondition = "";
+        let unitReplacements: any = { learnerId, unitId };
+
+        if (qualification_id) {
+          unitQualificationCondition =
+            "AND qualification_id = :qualification_id";
+          unitReplacements.qualification_id = qualification_id;
+        }
+
         const unitMarks = await sequelize.query(
           `
-          SELECT 
-              COALESCE(SUM(am.marks), 0) AS total_marks,
-              COALESCE(SUM(am.max_marks), 0) AS total_max_marks
-          FROM tbl_assessment_marks am
-          INNER JOIN (
-              SELECT 
-                  learner_id,
-                  qualification_id,
-                  unit_id,
-                  sub_outcome_id,
-                  COALESCE(subpoint_id, -1) AS subpoint_group,
-                  MAX(marks) AS best_marks
-              FROM tbl_assessment_marks
-              WHERE learner_id = :learnerId 
-                AND unit_id = :unitId
-                AND deletedAt IS NULL
-              GROUP BY learner_id, qualification_id, unit_id, sub_outcome_id, COALESCE(subpoint_id, -1)
-          ) best
-            ON am.learner_id = best.learner_id
-           AND am.qualification_id = best.qualification_id
-           AND am.unit_id = best.unit_id
-           AND am.sub_outcome_id = best.sub_outcome_id
-           AND COALESCE(am.subpoint_id, -1) = best.subpoint_group
-           AND am.marks = best.best_marks
-          WHERE am.deletedAt IS NULL
-          `,
+  SELECT 
+      COALESCE(SUM(am.marks), 0) AS total_marks,
+      COALESCE(SUM(am.max_marks), 0) AS total_max_marks
+  FROM tbl_assessment_marks am
+  INNER JOIN (
+      SELECT 
+          learner_id,
+          qualification_id,
+          unit_id,
+          sub_outcome_id,
+          COALESCE(subpoint_id, -1) AS subpoint_group,
+          MAX(marks) AS best_marks
+      FROM tbl_assessment_marks
+      WHERE learner_id = :learnerId 
+        ${unitQualificationCondition}
+        AND unit_id = :unitId
+        AND deletedAt IS NULL
+      GROUP BY learner_id, qualification_id, unit_id, sub_outcome_id, COALESCE(subpoint_id, -1)
+  ) best
+    ON am.learner_id = best.learner_id
+   AND am.qualification_id = best.qualification_id
+   AND am.unit_id = best.unit_id
+   AND am.sub_outcome_id = best.sub_outcome_id
+   AND COALESCE(am.subpoint_id, -1) = best.subpoint_group
+   AND am.marks = best.best_marks
+  WHERE am.deletedAt IS NULL
+  `,
           {
-            replacements: { learnerId, unitId },
+            replacements: unitReplacements,
             type: sequelize.QueryTypes.SELECT,
           }
         );
@@ -1734,9 +1750,9 @@ class AssessmentService {
 
         // Get the unit details to include unit_number in response
         const unitDetails = await Units.findByPk(unitId, {
-          attributes: ['id', 'unit_number', 'unit_title', 'qualification_id'],
+          attributes: ["id", "unit_number", "unit_title", "qualification_id"],
         });
-        
+
         unitsProgress.push({
           unit_id: unitId,
           unit_number: unitDetails ? unitDetails.unit_number : null,
