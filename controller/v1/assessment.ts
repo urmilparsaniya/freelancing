@@ -158,6 +158,40 @@ class assessmentController {
       res.handler.serverError(error);
     }
   }
+
+  // Create Assessment with Chunk Upload
+  static async createAssessmentWithChunkUpload(req: Request, res: Response): Promise<void> {
+    try {
+      let data = req.body;
+      //@ts-ignore
+      let files = req.files?.files || [];
+      //@ts-ignore
+      let learnerFiles = req.files?.learner_upload_files || [];
+      let userData = req.headers["user_info"] as userAuthenticationData;
+      let chunkSize = data.chunkSize || 5 * 1024 * 1024; // Default 5MB
+      
+      let request = await AssessmentService.createAssessmentWithChunkUpload(
+        data, 
+        userData, 
+        files, 
+        learnerFiles, 
+        chunkSize
+      );
+      
+      if (request.status !== STATUS_CODES.SUCCESS) {
+        res.handler.errorResponse(request.status, request.message);
+        return;
+      }
+      res.handler.successResponse(
+        request.status,
+        request.data,
+        request.message
+      );
+    } catch (error) {
+      error = "server error";
+      res.handler.serverError(error);
+    }
+  }
 }
 
 export default assessmentController;

@@ -55,4 +55,20 @@ router
   .route("/statistics")
   .get(authenticateUser, assessmentController.statistics);
 
+// Create Assessment with Chunk Upload
+router
+  .route("/create-chunk")
+  .post(
+    validate([
+      body("title").trim().notEmpty().withMessage("Title is required"),
+      body("date").trim().notEmpty().withMessage("Date is required"),
+      body("location").trim().notEmpty().withMessage("Location is required"),
+      body("unit_ids").notEmpty().withMessage("Unit ID is required"),
+      body("method_ids").notEmpty().withMessage("Method ID is required"),
+      body("learner_id").notEmpty().withMessage("Learner Id is required")
+    ]),
+    authenticateUser, 
+    assessmentController.createAssessmentWithChunkUpload
+  );
+
 export default router;

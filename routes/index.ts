@@ -12,6 +12,7 @@ import Admin from "./v1/admin";
 import masterRoute from "./v1/master";
 import assessment from "./v1/assessment";
 import requestQualification from "./v1/request_qualification";
+import chunkUpload from "./v1/chunk_upload";
 
 dotenv.config();
 
@@ -101,5 +102,11 @@ export default (app: Application): void => {
     "/" + process.env.API_BASE_URL + "/v1/request-qualification",
     upload.single("file"),
     requestQualification
+  );
+
+  // Chunk Upload Routes
+  app.use(
+    "/" + process.env.API_BASE_URL + "/v1/chunk-upload",
+    chunkUpload
   );
 };

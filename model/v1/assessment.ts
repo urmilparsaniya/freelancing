@@ -17,6 +17,11 @@ import {
   generateSecurePassword,
   paginate,
   uploadFileOnAWS,
+  initChunkUpload,
+  uploadChunk,
+  completeChunkUpload,
+  abortChunkUpload,
+  splitFileIntoChunks,
 } from "../../helper/utils";
 import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
@@ -325,6 +330,399 @@ class AssessmentService {
       };
     } catch (error) {
       console.error("Error creating assessment:", error);
+      await transaction.rollback();
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: "Server error",
+      };
+    }
+  }
+
+  // Create Assessment with Chunk Upload
+  static async createAssessmentWithChunkUpload(
+    data: any,
+    userData: userAuthenticationData,
+    files: any[],
+    learnerFiles: any[] = [],
+    chunkSize: number = 5 * 1024 * 1024 // 5MB default chunk size
+  ): Promise<any> {
+    const transaction = await sequelize.transaction();
+    try {
+      if ("id" in data) {
+        delete data.id;
+      }
+      
+      // Check if Logged in user is not from admin | assessor throw an error
+      let userData_ = await User.findOne({
+        where: { id: userData.id },
+        attributes: ["id", "role", "center_id"],
+      });
+
+      if (
+        !userData_ ||
+        ![Roles.ADMIN, Roles.ASSESSOR, Roles.IQA].includes(userData_.role)
+      ) {
+        await transaction.rollback();
+        return {
+          status: STATUS_CODES.FORBIDDEN,
+          message:
+            "Only Admins, Assessors and IQA are allowed to create assessments.",
+        };
+      }
+      data.assessor_id = userData_.id;
+      data.center_id = userData_.center_id;
+
+      // Create Assessment Methods
+      if (data.methods && data.methods.length > 0) {
+        try {
+          const validMethods = await Methods.findAll({
+            where: { id: { [Op.in]: data.methods } },
+            attributes: ["id"],
+          });
+
+          if (validMethods.length !== data.methods.length) {
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.BAD_REQUEST,
+              message: "Some methods are invalid",
+            };
+          }
+
+          await AssessmentMethod.bulkCreate(
+            data.methods.map((methodId: number) => ({
+              assessment_id: 0, // Will be updated after assessment creation
+              method_id: methodId,
+            })),
+            { transaction }
+          );
+        } catch (error) {
+          console.error("Error creating assessment methods:", error);
+          await transaction.rollback();
+          return {
+            status: STATUS_CODES.SERVER_ERROR,
+            message: "Error creating assessment methods",
+          };
+        }
+      }
+
+      // Create Assessment Units
+      if (data.units && data.units.length > 0) {
+        try {
+          const validUnits = await Units.findAll({
+            where: { id: { [Op.in]: data.units } },
+            attributes: ["id"],
+          });
+
+          if (validUnits.length !== data.units.length) {
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.BAD_REQUEST,
+              message: "Some units are invalid",
+            };
+          }
+
+          await AssessmentUnits.bulkCreate(
+            data.units.map((unitId: number) => ({
+              assessment_id: 0, // Will be updated after assessment creation
+              unit_id: unitId,
+            })),
+            { transaction }
+          );
+        } catch (error) {
+          console.error("Error creating assessment units:", error);
+          await transaction.rollback();
+          return {
+            status: STATUS_CODES.SERVER_ERROR,
+            message: "Error creating assessment units",
+          };
+        }
+      }
+
+      if (data.learner_id) {
+        try {
+          const validLearners = await UserLearner.findAll({
+            where: { id: { [Op.in]: data.learner_id } },
+            attributes: ["id"],
+          });
+
+          if (validLearners.length !== data.learner_id.length) {
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.BAD_REQUEST,
+              message: "Some learners are invalid",
+            };
+          }
+
+          await AssessmentLearner.bulkCreate(
+            data.learner_id.map((learnerId: number) => ({
+              assessment_id: 0, // Will be updated after assessment creation
+              learner_id: learnerId,
+            })),
+            { transaction }
+          );
+        } catch (error) {
+          console.error("Error creating assessment learner:", error);
+          await transaction.rollback();
+          return {
+            status: STATUS_CODES.SERVER_ERROR,
+            message: "Error creating assessment learner",
+          };
+        }
+      }
+
+      // Create the assessment first
+      const assessment = await Assessment.create(data, { transaction });
+
+      // Update method and unit references
+      if (data.methods && data.methods.length > 0) {
+        await AssessmentMethod.update(
+          { assessment_id: assessment.id },
+          { where: { assessment_id: 0 }, transaction }
+        );
+      }
+
+      if (data.units && data.units.length > 0) {
+        await AssessmentUnits.update(
+          { assessment_id: assessment.id },
+          { where: { assessment_id: 0 }, transaction }
+        );
+      }
+
+      if (data.learner_id && data.learner_id.length > 0) {
+        await AssessmentLearner.update(
+          { assessment_id: assessment.id },
+          { where: { assessment_id: 0 }, transaction }
+        );
+      }
+
+      const fileIds = [];
+      
+      // Handle file uploads with chunk upload
+      if (files && files.length > 0) {
+        for (const file of files) {
+          try {
+            const extension = extname(file.originalname);
+            const mainFileName = `assessment/${uuidv4()}${extension}`;
+            
+            // Initialize chunk upload
+            const initResult = await initChunkUpload(mainFileName, file.mimetype);
+            
+            if (initResult.status !== 1) {
+              await transaction.rollback();
+              return {
+                status: STATUS_CODES.SERVER_ERROR,
+                message: `Error initializing chunk upload: ${initResult.message}`,
+              };
+            }
+
+            // Split file into chunks
+            const chunks = splitFileIntoChunks(file.buffer, chunkSize);
+            const uploadedParts: Array<{ ETag: string; PartNumber: number }> = [];
+
+            // Upload each chunk
+            for (let i = 0; i < chunks.length; i++) {
+              const chunkResult = await uploadChunk(
+                initResult.uploadId,
+                initResult.key,
+                i + 1,
+                chunks[i]
+              );
+
+              if (chunkResult.status !== 1) {
+                // Abort upload on failure
+                await abortChunkUpload(initResult.uploadId, initResult.key);
+                await transaction.rollback();
+                return {
+                  status: STATUS_CODES.SERVER_ERROR,
+                  message: `Error uploading chunk ${i + 1}: ${chunkResult.message}`,
+                };
+              }
+
+              uploadedParts.push({
+                ETag: chunkResult.etag,
+                PartNumber: chunkResult.partNumber,
+              });
+            }
+
+            // Complete multipart upload
+            const completeResult = await completeChunkUpload(
+              initResult.uploadId,
+              initResult.key,
+              uploadedParts
+            );
+
+            if (completeResult.status !== 1) {
+              await transaction.rollback();
+              return {
+                status: STATUS_CODES.SERVER_ERROR,
+                message: `Error completing file upload: ${completeResult.message}`,
+              };
+            }
+
+            const fileType = await this.getFileType(file.mimetype);
+            const fileSize = file.size;
+            const fileName = file.originalname;
+
+            // Create File
+            const fileCreated = await Image.create(
+              {
+                entity_type: Entity.ASSESSMENT,
+                entity_id: assessment.id,
+                image: completeResult.fileUrl,
+                image_type: fileType,
+                image_name: fileName,
+                image_size: fileSize,
+              },
+              { transaction }
+            );
+            fileIds.push(fileCreated.id);
+          } catch (fileError) {
+            console.error("Error uploading file with chunk upload:", fileError);
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.SERVER_ERROR,
+              message: "Error uploading file with chunk upload",
+            };
+          }
+        }
+      }
+
+      // Handle learner file uploads with chunk upload
+      let learnerFileIds = [];
+      if (learnerFiles && learnerFiles.length > 0) {
+        for (const learnerFile of learnerFiles) {
+          try {
+            const extension = extname(learnerFile.originalname);
+            const mainFileName = `learner/${uuidv4()}${extension}`;
+            
+            // Initialize chunk upload
+            const initResult = await initChunkUpload(mainFileName, learnerFile.mimetype);
+            
+            if (initResult.status !== 1) {
+              await transaction.rollback();
+              return {
+                status: STATUS_CODES.SERVER_ERROR,
+                message: `Error initializing learner file chunk upload: ${initResult.message}`,
+              };
+            }
+
+            // Split file into chunks
+            const chunks = splitFileIntoChunks(learnerFile.buffer, chunkSize);
+            const uploadedParts: Array<{ ETag: string; PartNumber: number }> = [];
+
+            // Upload each chunk
+            for (let i = 0; i < chunks.length; i++) {
+              const chunkResult = await uploadChunk(
+                initResult.uploadId,
+                initResult.key,
+                i + 1,
+                chunks[i]
+              );
+
+              if (chunkResult.status !== 1) {
+                // Abort upload on failure
+                await abortChunkUpload(initResult.uploadId, initResult.key);
+                await transaction.rollback();
+                return {
+                  status: STATUS_CODES.SERVER_ERROR,
+                  message: `Error uploading learner file chunk ${i + 1}: ${chunkResult.message}`,
+                };
+              }
+
+              uploadedParts.push({
+                ETag: chunkResult.etag,
+                PartNumber: chunkResult.partNumber,
+              });
+            }
+
+            // Complete multipart upload
+            const completeResult = await completeChunkUpload(
+              initResult.uploadId,
+              initResult.key,
+              uploadedParts
+            );
+
+            if (completeResult.status !== 1) {
+              await transaction.rollback();
+              return {
+                status: STATUS_CODES.SERVER_ERROR,
+                message: `Error completing learner file upload: ${completeResult.message}`,
+              };
+            }
+
+            const fileType = await this.getFileType(learnerFile.mimetype);
+            const fileSize = learnerFile.size;
+            const fileName = learnerFile.originalname;
+
+            // Create Learner File
+            const fileCreated = await Image.create(
+              {
+                entity_type: Entity.LEARNER_ASSESSMENT,
+                entity_id: assessment.id,
+                image: completeResult.fileUrl,
+                image_type: fileType,
+                image_name: fileName,
+                image_size: fileSize,
+              },
+              { transaction }
+            );
+            learnerFileIds.push(fileCreated.id);
+          } catch (error) {
+            console.log("Error uploading learner file with chunk upload:", error);
+            await transaction.rollback();
+            return {
+              status: STATUS_CODES.SERVER_ERROR,
+              message: "Error uploading learner file with chunk upload",
+            };
+          }
+        }
+      }
+
+      // Handle assessment notes (same as original)
+      if (data.questionnaires && data.questionnaires.length > 0) {
+        try {
+          for (const questionnaire of data.questionnaires) {
+            const assessmentNote = await AssessmentNotes.create(
+              {
+                assessment_id: assessment.id,
+                uploaded_by: userData.role.toString(),
+                feedback: questionnaire.notes || "",
+                workflow_phase: this.getWorkflowPhase(
+                  data.assessment_status,
+                  userData.role
+                ),
+              },
+              { transaction }
+            );
+
+            if (questionnaire.fileIds && questionnaire.fileIds.length > 0) {
+              await AssessmentNoteFiles.bulkCreate(
+                questionnaire.fileIds.map((fid: number) => ({
+                  assessment_note_id: assessmentNote.id,
+                  file_id: fid,
+                })),
+                { transaction }
+              );
+            }
+          }
+        } catch (error) {
+          console.error("Error creating assessment note:", error);
+          await transaction.rollback();
+          return {
+            status: STATUS_CODES.SERVER_ERROR,
+            message: "Error creating assessment note",
+          };
+        }
+      }
+
+      await transaction.commit();
+      return {
+        status: STATUS_CODES.SUCCESS,
+        data: assessment,
+        message: "Assessment created successfully with chunk upload",
+      };
+    } catch (error) {
+      console.error("Error creating assessment with chunk upload:", error);
       await transaction.rollback();
       return {
         status: STATUS_CODES.SERVER_ERROR,

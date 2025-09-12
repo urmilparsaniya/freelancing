@@ -5,6 +5,11 @@ import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+  ListPartsCommand,
 } from "@aws-sdk/client-s3";
 import NodeCache from "node-cache";
 import { userAuthenticationData } from "../interface/user";
@@ -277,3 +282,209 @@ export const qualificationUserId = async (userData: userAuthenticationData): Pro
     return null;
   }
 }
+
+// Chunk Upload Interfaces
+export interface ChunkUploadInitResponse {
+  uploadId: string;
+  key: string;
+  status: number;
+  message: string;
+}
+
+export interface ChunkUploadProgress {
+  uploadId: string;
+  key: string;
+  partNumber: number;
+  etag: string;
+  status: number;
+  message: string;
+}
+
+export interface ChunkUploadCompleteResponse {
+  fileUrl: string;
+  status: number;
+  message: string;
+}
+
+// Initialize multipart upload
+export const initChunkUpload = async (
+  fileName: string,
+  contentType: string
+): Promise<ChunkUploadInitResponse> => {
+  try {
+    const params = {
+      Bucket: process.env.AWS_BUCKET,
+      Key: fileName,
+      ContentType: contentType,
+    };
+
+    const command = new CreateMultipartUploadCommand(params);
+    const response = await s3Client.send(command);
+
+    return {
+      uploadId: response.UploadId!,
+      key: fileName,
+      status: 1,
+      message: "Multipart upload initialized successfully",
+    };
+  } catch (error) {
+    console.error("Error initializing multipart upload:", error);
+    return {
+      uploadId: "",
+      key: fileName,
+      status: 0,
+      message: "Error initializing multipart upload",
+    };
+  }
+};
+
+// Upload chunk
+export const uploadChunk = async (
+  uploadId: string,
+  key: string,
+  partNumber: number,
+  chunk: Buffer
+): Promise<ChunkUploadProgress> => {
+  try {
+    const params = {
+      Bucket: process.env.AWS_BUCKET,
+      Key: key,
+      PartNumber: partNumber,
+      UploadId: uploadId,
+      Body: chunk,
+    };
+
+    const command = new UploadPartCommand(params);
+    const response = await s3Client.send(command);
+
+    return {
+      uploadId,
+      key,
+      partNumber,
+      etag: response.ETag!,
+      status: 1,
+      message: "Chunk uploaded successfully",
+    };
+  } catch (error) {
+    console.error("Error uploading chunk:", error);
+    return {
+      uploadId,
+      key,
+      partNumber,
+      etag: "",
+      status: 0,
+      message: "Error uploading chunk",
+    };
+  }
+};
+
+// Complete multipart upload
+export const completeChunkUpload = async (
+  uploadId: string,
+  key: string,
+  parts: Array<{ ETag: string; PartNumber: number }>
+): Promise<ChunkUploadCompleteResponse> => {
+  try {
+    const params = {
+      Bucket: process.env.AWS_BUCKET,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: {
+        Parts: parts,
+      },
+    };
+
+    const command = new CompleteMultipartUploadCommand(params);
+    await s3Client.send(command);
+
+    const fileUrl = `https://${process.env.AWS_BUCKET}.s3.${process.env.AWS_REGION_NAME}.amazonaws.com/${key}`;
+
+    return {
+      fileUrl,
+      status: 1,
+      message: "File upload completed successfully",
+    };
+  } catch (error) {
+    console.error("Error completing multipart upload:", error);
+    return {
+      fileUrl: "",
+      status: 0,
+      message: "Error completing file upload",
+    };
+  }
+};
+
+// Abort multipart upload
+export const abortChunkUpload = async (
+  uploadId: string,
+  key: string
+): Promise<{ status: number; message: string }> => {
+  try {
+    const params = {
+      Bucket: process.env.AWS_BUCKET,
+      Key: key,
+      UploadId: uploadId,
+    };
+
+    const command = new AbortMultipartUploadCommand(params);
+    await s3Client.send(command);
+
+    return {
+      status: 1,
+      message: "Multipart upload aborted successfully",
+    };
+  } catch (error) {
+    console.error("Error aborting multipart upload:", error);
+    return {
+      status: 0,
+      message: "Error aborting multipart upload",
+    };
+  }
+};
+
+// Get upload progress
+export const getUploadProgress = async (
+  uploadId: string,
+  key: string
+): Promise<{ parts: any[]; status: number; message: string }> => {
+  try {
+    const params = {
+      Bucket: process.env.AWS_BUCKET,
+      Key: key,
+      UploadId: uploadId,
+    };
+
+    const command = new ListPartsCommand(params);
+    const response = await s3Client.send(command);
+
+    return {
+      parts: response.Parts || [],
+      status: 1,
+      message: "Upload progress retrieved successfully",
+    };
+  } catch (error) {
+    console.error("Error getting upload progress:", error);
+    return {
+      parts: [],
+      status: 0,
+      message: "Error getting upload progress",
+    };
+  }
+};
+
+// Helper function to split file into chunks
+export const splitFileIntoChunks = (
+  buffer: Buffer,
+  chunkSize: number = 5 * 1024 * 1024 // 5MB default chunk size
+): Buffer[] => {
+  const chunks: Buffer[] = [];
+  let offset = 0;
+
+  while (offset < buffer.length) {
+    const end = Math.min(offset + chunkSize, buffer.length);
+    chunks.push(buffer.slice(offset, end));
+    offset = end;
+  }
+
+  return chunks;
+};
