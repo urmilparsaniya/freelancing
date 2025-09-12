@@ -191,8 +191,24 @@ class RequestQualificationService {
         centerWhereCondition.id = userData.center_id
       }
 
+      let search = data?.search || "";
+
+      let searchOptions = {};
+      if (search) {
+        searchOptions = {
+          [Op.or]: [
+            { qualification_title: { [Op.like]: `%${search}%` } },
+            { qualification_number: { [Op.like]: `%${search}%` } },
+            { '$center.center_name$': { [Op.like]: `%${search}%` } }
+          ]
+        };
+      }
+
       let requestQualification = await RequestQualification.findAndCountAll({
-        where: whereCondition,
+        where: {
+          ...searchOptions,
+          ...whereCondition,
+        },
         include: [
           {
             model: Center,

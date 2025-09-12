@@ -242,19 +242,30 @@ class AdminService {
       let order: Order = [[sort_by, sort_order]];
       const fetchAll = limit === 0 || page === 0;
 
+      let search = data?.search || "";
+
       // Where condition
       let whereCondition: any = { deletedAt: null, role: Roles.ADMIN };
-      // let center_id = data.center_id
-      //   ? data.center_id
-      //   : await centerId(userData);
-      // let center_data;
-      // if (center_id) {
-      //   whereCondition.center_id = center_id;
-      //   center_data = await Center.findById(center_id);
-      // }
+      
+      // Search options for user fields and related center
+      let searchOptions = {};
+      if (search) {
+        searchOptions = {
+          [Op.or]: [
+            { name: { [Op.like]: `%${search}%` } },
+            { surname: { [Op.like]: `%${search}%` } },
+            { email: { [Op.like]: `%${search}%` } },
+            Sequelize.literal(`CONCAT(User.name, ' ', User.surname) LIKE '%${search}%'`),
+            { '$center.center_name$': { [Op.like]: `%${search}%` } }
+          ]
+        };
+      }
 
       let userData_ = await User.findAndCountAll({
-        where: whereCondition,
+        where: {
+          ...whereCondition,
+          ...searchOptions
+        },
         include: [
           {
             model: Qualifications,
@@ -291,6 +302,7 @@ class AdminService {
         message: "Admin List fetched successfully",
       };
     } catch (error) {
+      console.log("Error:", error);
       return {
         status: STATUS_CODES.SERVER_ERROR,
         message: "Server error",

@@ -525,8 +525,23 @@ class qualificationService {
         userQualificationRequired = true;
       }
 
+      let search = data?.search || "";
+
+      let searchOptions = {};
+      if (search) {
+        searchOptions = {
+          [Op.or]: [
+            { name: { [Op.like]: `%${search}%` } },
+            { qualification_no: { [Op.like]: `%${search}%` } },
+          ]
+        };
+      }
+
       let qualifications = await Qualifications.findAndCountAll({
-        where: { deletedAt: null },
+        where: {
+          ...searchOptions,
+          deletedAt: null
+        },
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
         include: [
