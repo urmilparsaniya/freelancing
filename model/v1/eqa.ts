@@ -243,8 +243,24 @@ class EQAService {
         includeRequired = true;
       }
 
+      let search = data?.search || "";
+      let searchOptions = {};
+      if (search) {
+        searchOptions = {
+          [Op.or]: [
+            { name: { [Op.like]: `%${search}%` } },
+            { surname: { [Op.like]: `%${search}%` } },
+            { email: { [Op.like]: `%${search}%` } },
+            Sequelize.literal(`CONCAT(User.name, ' ', User.surname) LIKE '%${search}%'`),
+          ]
+        };
+      }
+
       let userData_ = await User.findAndCountAll({
-        where: whereCondition,
+        where: {
+          ...searchOptions,
+          ...whereCondition,
+        },
         include: [
           {
             model: Qualifications,

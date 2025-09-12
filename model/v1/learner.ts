@@ -375,8 +375,37 @@ class LearnerService {
         includeRequiredAssessor = true;
       }
 
+      let search = data?.search || "";
+      let searchOptions = {};
+      if (search) {
+        // Remove any non-digit characters from search for phone number matching
+        let cleanSearch = search.replace(/\D/g, '');
+        
+        searchOptions = {
+          [Op.or]: [
+            { name: { [Op.like]: `%${search}%` } },
+            { surname: { [Op.like]: `%${search}%` } },
+            { phone_number: { [Op.like]: `%${search}%` } },
+            { phone_code: { [Op.like]: `%${search}%` } },
+            Sequelize.literal(`CONCAT(User.name, ' ', User.surname) LIKE '%${search}%'`),
+            Sequelize.literal(`CONCAT(User.phone_code, ' ', User.phone_number) LIKE '%${search}%'`),
+            // Search for phone number without country code
+            Sequelize.literal(`User.phone_number LIKE '%${cleanSearch}%'`),
+            // Search for concatenated phone code and number without space
+            Sequelize.literal(`CONCAT(User.phone_code, User.phone_number) LIKE '%${search}%'`),
+            // Search for concatenated phone code and number with space
+            Sequelize.literal(`CONCAT(User.phone_code, ' ', User.phone_number) LIKE '%${search}%'`),
+            // Search for phone number with country code (digits only)
+            Sequelize.literal(`CONCAT(REPLACE(User.phone_code, '+', ''), User.phone_number) LIKE '%${cleanSearch}%'`),
+          ]
+        };
+      }
+      console.log(searchOptions);
       let userData_ = await User.findAndCountAll({
-        where: whereCondition,
+        where: {
+          ...searchOptions,
+          ...whereCondition,
+        },
         include: [
           {
             model: Qualifications,
