@@ -1404,8 +1404,22 @@ class AssessmentService {
         requiredQualification = true;
       }
 
+      // Search
+      let search = data?.search || "";
+      let searchOptions = {};
+      if (search) {
+        searchOptions = {
+          [Op.or]: [
+            { title: { [Op.like]: `%${search}%` } },
+          ]
+        };
+      }
+
       let assessment_ = await Assessment.findAndCountAll({
-        where: whereCondition,
+        where: {
+          ...searchOptions,
+          ...whereCondition,
+        },
         include: [
           // {
           //   model: Methods,
