@@ -238,7 +238,7 @@ class LearnerService {
         await UserAssessor.destroy({
           where: { user_id: learnerId },
           force: true,
-          transaction
+          transaction,
         });
         // Insert updated assessor associations
         await UserAssessor.bulkCreate(
@@ -273,7 +273,7 @@ class LearnerService {
         await UserIQA.destroy({
           where: { user_id: learnerId },
           force: true,
-          transaction
+          transaction,
         });
         // Insert updated IQA associations
         await UserIQA.bulkCreate(
@@ -350,7 +350,7 @@ class LearnerService {
       };
       // let includeRequired = false;
       let includeRequiredAssessor = false;
-      let includeRequiredIqa = false
+      let includeRequiredIqa = false;
 
       // Qualification Management
       if (data?.user_id) {
@@ -358,7 +358,7 @@ class LearnerService {
         qualificationRequired = true;
         whereConditionInclude.id = data.user_id;
         includeRequiredAssessor = true;
-        includeRequiredIqa = true
+        includeRequiredIqa = true;
       }
 
       if (data.iqa_id) {
@@ -368,39 +368,52 @@ class LearnerService {
 
       // Check if logged in user is assessor then only assigned learner will show
       let isAssessor = await User.findOne({
-        where: { id: userData.id, role: Roles.ASSESSOR ,deletedAt: null },
+        where: { id: userData.id, role: Roles.ASSESSOR, deletedAt: null },
       });
+
       if (isAssessor) {
-        whereConditionInclude.id = userData.id;
-        includeRequiredAssessor = true;
+        // Use the correct column name (user_id) instead of learner_id
+        whereCondition.id = {
+          [Op.in]: Sequelize.literal(`(
+      SELECT user_id
+      FROM tbl_user_assessor
+      WHERE assessor_id = ${userData.id}
+    )`),
+        };
       }
 
       let search = data?.search || "";
       let searchOptions = {};
       if (search) {
         // Remove any non-digit characters from search for phone number matching
-        let cleanSearch = search.replace(/\D/g, '');
-        
+        let cleanSearch = search.replace(/\D/g, "");
+
         searchOptions = {
           [Op.or]: [
             { name: { [Op.like]: `%${search}%` } },
             { surname: { [Op.like]: `%${search}%` } },
             { phone_number: { [Op.like]: `%${search}%` } },
             { phone_code: { [Op.like]: `%${search}%` } },
-            Sequelize.literal(`CONCAT(User.name, ' ', User.surname) LIKE '%${search}%'`),
-            Sequelize.literal(`CONCAT(User.phone_code, ' ', User.phone_number) LIKE '%${search}%'`),
+            Sequelize.literal(
+              `CONCAT(User.name, ' ', User.surname) LIKE '%${search}%'`
+            ),
+            Sequelize.literal(
+              `CONCAT(User.phone_code, ' ', User.phone_number) LIKE '%${search}%'`
+            ),
             // // Search for phone number without country code
             // Sequelize.literal(`User.phone_number LIKE '%${cleanSearch}%'`),
             // Search for concatenated phone code and number without space
-            Sequelize.literal(`CONCAT(User.phone_code, User.phone_number) LIKE '%${search}%'`),
+            Sequelize.literal(
+              `CONCAT(User.phone_code, User.phone_number) LIKE '%${search}%'`
+            ),
             // // Search for concatenated phone code and number with space
             // Sequelize.literal(`CONCAT(User.phone_code, ' ', User.phone_number) LIKE '%${search}%'`),
             // // Search for phone number with country code (digits only)
             // Sequelize.literal(`CONCAT(REPLACE(User.phone_code, '+', ''), User.phone_number) LIKE '%${cleanSearch}%'`),
-          ]
+          ],
         };
       }
-      console.log(searchOptions);
+
       let userData_ = await User.findAndCountAll({
         where: {
           ...searchOptions,
@@ -414,13 +427,13 @@ class LearnerService {
             required: qualificationRequired,
             through: { attributes: [] }, // prevent including join table info
           },
-          {
-            model: User,
-            as: "assessors",
-            through: { attributes: [] },
-            where: whereConditionInclude,
-            required: includeRequiredAssessor,
-          },
+          // {
+          //   model: User,
+          //   as: "assessors",
+          //   through: { attributes: [] },
+          //   where: whereConditionInclude,
+          //   required: includeRequiredAssessor,
+          // },
           {
             model: User,
             as: "iqas",
@@ -432,7 +445,7 @@ class LearnerService {
             model: Center,
             as: "center",
             attributes: ["id", "center_name", "center_address"],
-          }
+          },
         ],
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
@@ -499,7 +512,7 @@ class LearnerService {
             as: "center",
             required: false,
             attributes: ["id", "center_name", "center_address"],
-          }
+          },
         ],
       });
       return {
