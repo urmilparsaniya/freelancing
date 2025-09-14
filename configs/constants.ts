@@ -190,6 +190,7 @@ export const Entity = {
   OBSERVER: 'observer',
   IQA: 'iqa',
   EQA: 'eqa',
+  MODULE_RECORDS: "module_records"
 }
 
 export const EntityType = {
@@ -217,4 +218,12 @@ export const RoleSlug = {
   IQA: "iqa",
   EQA: "eqa",
   ADMIN: "admin",
+}
+
+export const ModuleTypes = {
+  // 1: resources, 2: journal, 3: additional_info, 4: contact_log
+  RESOURCE: 1,
+  JOURNAL: 2,
+  ADDITIONAL_INFO: 3,
+  CONTACT_LOG: 4
 }

@@ -13,6 +13,7 @@ import masterRoute from "./v1/master";
 import assessment from "./v1/assessment";
 import requestQualification from "./v1/request_qualification";
 import chunkUpload from "./v1/chunk_upload";
+import moduleRecords from "./v1/modules_records"
 
 dotenv.config();
 
@@ -109,4 +110,11 @@ export default (app: Application): void => {
     "/" + process.env.API_BASE_URL + "/v1/chunk-upload",
     chunkUpload
   );
+
+  // Module Records Routes
+  app.use(
+    "/" + process.env.API_BASE_URL + "/v1/module-records",
+    upload.array("files"),
+    moduleRecords
+  )
 };
