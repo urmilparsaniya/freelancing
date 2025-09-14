@@ -13,6 +13,7 @@ class UserQualification
   public user_id: number;
   public qualification_id: number;
   public status: number;
+  public is_signed_off: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
   public deletedAt?: Date;
@@ -33,6 +34,10 @@ UserQualification.init(
       type: DataTypes.INTEGER,
       comment: "1: Active, 2: Inactive",
       defaultValue: 1,
+    },
+    is_signed_off: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     },
   },
   {

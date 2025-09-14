@@ -77,6 +77,33 @@ class MasterService {
       };
     }
   }
+
+  // Signed Off Qualification
+  static async signedOff(data: any, userData: userAuthenticationData): Promise<any> {
+    try {
+      let userQualification = await UserQualification.findOne({
+        where: { qualification_id: data.qualification_id, user_id: data.learner_id }
+      })
+      if (!userQualification) {
+        return {
+          status: STATUS_CODES.NOT_FOUND,
+          message: "Qualification not found",
+        };
+      }
+      await userQualification.update({ is_signed_off: true });
+      return {
+        status: STATUS_CODES.SUCCESS,
+        data: null,
+        message: "Qualification signed off successfully",
+      };
+    } catch (error) {
+      console.log(error);
+      return {
+        status: STATUS_CODES.SERVER_ERROR,
+        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+      };
+    }
+  }
 }
 
 export default MasterService;

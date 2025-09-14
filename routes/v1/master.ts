@@ -16,4 +16,7 @@ router.route("/centers").get(authenticateUser, MasterController.getAllCenters);
 // Get All Methods route
 router.route("/methods").get(authenticateUser, MasterController.getAllMethods);
 
+// Signed Off route
+router.route("/signed-off").put(authenticateUser, MasterController.signedOff);
+
 export default router;

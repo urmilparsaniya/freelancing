@@ -3,6 +3,7 @@ export interface UserQualificationInterface {
   user_id: number;
   qualification_id: number;
   status: number;
+  is_signed_off: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
