@@ -275,6 +275,7 @@ class AdminService {
           {
             model: Center,
             as: "center",
+            required: true,
             attributes: ["id", "center_name", "center_address"],
           },
         ],

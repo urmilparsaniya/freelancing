@@ -205,14 +205,14 @@ class IQAService {
             { phone_code: { [Op.like]: `%${search}%` } },
             Sequelize.literal(`CONCAT(User.name, ' ', User.surname) LIKE '%${search}%'`),
             Sequelize.literal(`CONCAT(User.phone_code, ' ', User.phone_number) LIKE '%${search}%'`),
-            // Search for phone number without country code
-            Sequelize.literal(`User.phone_number LIKE '%${cleanSearch}%'`),
+            // // Search for phone number without country code
+            // Sequelize.literal(`User.phone_number LIKE '%${cleanSearch}%'`),
             // Search for concatenated phone code and number without space
             Sequelize.literal(`CONCAT(User.phone_code, User.phone_number) LIKE '%${search}%'`),
-            // Search for concatenated phone code and number with space
-            Sequelize.literal(`CONCAT(User.phone_code, ' ', User.phone_number) LIKE '%${search}%'`),
-            // Search for phone number with country code (digits only)
-            Sequelize.literal(`CONCAT(REPLACE(User.phone_code, '+', ''), User.phone_number) LIKE '%${cleanSearch}%'`),
+            // // Search for concatenated phone code and number with space
+            // Sequelize.literal(`CONCAT(User.phone_code, ' ', User.phone_number) LIKE '%${search}%'`),
+            // // Search for phone number with country code (digits only)
+            // Sequelize.literal(`CONCAT(REPLACE(User.phone_code, '+', ''), User.phone_number) LIKE '%${cleanSearch}%'`),
           ]
         };
       }
