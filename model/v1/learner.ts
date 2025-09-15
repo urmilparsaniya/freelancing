@@ -35,6 +35,13 @@ class LearnerService {
       data.center_id = userData.center_id;
       // Generate Secure Password
       data.password = await generateSecurePassword();
+      // Calculate license year expiry
+      if (data.license_year) {
+        let expiryDate = new Date();
+        expiryDate.setFullYear(expiryDate.getFullYear() + data.license_year);
+        // Format yyyy-mm-dd
+        data.license_year_expiry = expiryDate.toISOString().split("T")[0];
+      }
       let createUser = await User.create(data, { transaction });
       // Create Qualification of Learner
       // Parse qualifications (assuming it's a comma-separated string)
@@ -175,6 +182,12 @@ class LearnerService {
         };
       }
       data.center_id = userData.center_id;
+      if (data.license_year) {
+        let expiryDate = new Date();
+        expiryDate.setFullYear(expiryDate.getFullYear() + data.license_year);
+        // Format yyyy-mm-dd
+        data.license_year_expiry = expiryDate.toISOString().split("T")[0];
+      }
       // Update user data
       await User.update(data, {
         where: { id: learnerId },

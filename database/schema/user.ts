@@ -41,6 +41,8 @@ class User extends Model<UserInterface> implements UserInterface {
   public additional_learning_text!: string;
   public default_center?: number; // Optional field for default center
   public additional_learning_needs!: number; // 1: Yes | 2: No | 3: Prefer not to say
+  public license_year!: number;
+  public license_year_expiry!: string;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -191,6 +193,17 @@ User.init(
       type: DataTypes.INTEGER,
       allowNull: true, // Optional field for additional Assessor ID
       comment: "Optional field for additional Assessor ID",
+    },
+    license_year: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "Learner License Year",
+      defaultValue: 0
+    },
+    license_year_expiry: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "Learner License Year Expiry"
     }
   },
   { ...BaseModel.initBaseOptions(sequelize), tableName: TABLE_NAME.USER }

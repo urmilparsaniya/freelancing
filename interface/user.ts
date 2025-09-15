@@ -47,6 +47,8 @@ export interface UserInterface {
   iqas?: string;
   additional_iqa_id?: number; // Optional field for additional IQA ID
   additional_assessor_id?: number; // Optional field for additional Assessor ID
+  license_year?: number;
+  license_year_expiry?: string;
 }
 
 export interface userAuthenticationData {
