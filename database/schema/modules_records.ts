@@ -14,6 +14,7 @@ class ModuleRecords
   public id!: number;
   public module_type: number;
   public title: string;
+  public notes: string;
   public date: string;
   public center_id: number;
   public created_by: number;
@@ -51,6 +52,10 @@ ModuleRecords.init(
       type: DataTypes.INTEGER,
       comment: "1: Active, 2: Inactive",
       defaultValue: 1,
+    },
+    notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
   },
   {

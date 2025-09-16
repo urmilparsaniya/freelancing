@@ -4,6 +4,7 @@ export interface ModuleRecordsInterface {
   title: string;
   date: string;
   center_id: number;
+  notes: string;
   created_by: number;
   status: number; // 1: Active, 2: Inactive
   createdAt?: Date;
