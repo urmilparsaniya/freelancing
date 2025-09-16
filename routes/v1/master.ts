@@ -19,4 +19,7 @@ router.route("/methods").get(authenticateUser, MasterController.getAllMethods);
 // Signed Off route
 router.route("/signed-off").put(authenticateUser, MasterController.signedOff);
 
+// Dashboard route
+router.route("/dashboard").get(authenticateUser, MasterController.getDashboard);
+
 export default router;

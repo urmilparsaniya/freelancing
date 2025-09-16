@@ -36,6 +36,7 @@ class LearnerService {
       // Generate Secure Password
       data.password = await generateSecurePassword();
       // Calculate license year expiry
+      data.license_year = data.license_year || 3;
       if (data.license_year) {
         let expiryDate = new Date();
         expiryDate.setFullYear(expiryDate.getFullYear() + data.license_year);
