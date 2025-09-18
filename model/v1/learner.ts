@@ -384,22 +384,6 @@ class LearnerService {
         includeRequiredIqa = true;
       }
 
-      // Check if logged in user is assessor then only assigned learner will show
-      let isAssessor = await User.findOne({
-        where: { id: userData.id, role: Roles.ASSESSOR, deletedAt: null },
-      });
-
-      if (isAssessor) {
-        // Use the correct column name (user_id) instead of learner_id
-        whereCondition.id = {
-          [Op.in]: Sequelize.literal(`(
-      SELECT user_id
-      FROM tbl_user_assessor
-      WHERE assessor_id = ${userData.id}
-    )`),
-        };
-      }
-
       let search = data?.search || "";
       let searchOptions = {};
       if (search) {
@@ -432,39 +416,58 @@ class LearnerService {
         };
       }
 
+      // Check if logged in user is assessor then only assigned learner will show
+      let isAssessor = await User.findOne({
+        where: { id: userData.id, role: Roles.ASSESSOR, deletedAt: null },
+      });
+
+      let include = [
+        {
+          model: Qualifications,
+          as: "qualifications",
+          where: whereConditionQualification,
+          required: qualificationRequired,
+          through: { attributes: [] }, // prevent including join table info
+        },
+        {
+          model: User,
+          as: "iqas",
+          through: { attributes: [] },
+          where: whereConditionInclude,
+          required: includeRequiredIqa,
+        },
+        {
+          model: Center,
+          as: "center",
+          attributes: ["id", "center_name", "center_address"],
+        },
+      ]
+
+      if (isAssessor) {
+        // Use the correct column name (user_id) instead of learner_id
+        whereCondition.id = {
+          [Op.in]: Sequelize.literal(`(
+            SELECT user_id
+            FROM tbl_user_assessor
+            WHERE assessor_id = ${userData.id}
+          )`),
+        };
+      } else {
+        include.push({
+          model: User,
+          as: "assessors",
+          through: { attributes: [] },
+          where: whereConditionInclude,
+          required: includeRequiredAssessor,
+        })
+      }
+
       let userData_ = await User.findAndCountAll({
         where: {
           ...searchOptions,
           ...whereCondition,
         },
-        include: [
-          {
-            model: Qualifications,
-            as: "qualifications",
-            where: whereConditionQualification,
-            required: qualificationRequired,
-            through: { attributes: [] }, // prevent including join table info
-          },
-          // {
-          //   model: User,
-          //   as: "assessors",
-          //   through: { attributes: [] },
-          //   where: whereConditionInclude,
-          //   required: includeRequiredAssessor,
-          // },
-          {
-            model: User,
-            as: "iqas",
-            through: { attributes: [] },
-            where: whereConditionInclude,
-            required: includeRequiredIqa,
-          },
-          {
-            model: Center,
-            as: "center",
-            attributes: ["id", "center_name", "center_address"],
-          },
-        ],
+        include: include,
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
         order,

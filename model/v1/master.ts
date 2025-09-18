@@ -91,7 +91,7 @@ class MasterService {
           message: "Qualification not found",
         };
       }
-      await userQualification.update({ is_signed_off: true });
+      await userQualification.update({ is_signed_off: data.is_sign_off });
       return {
         status: STATUS_CODES.SUCCESS,
         data: null,
