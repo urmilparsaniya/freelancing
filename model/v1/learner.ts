@@ -427,7 +427,7 @@ class LearnerService {
           as: "qualifications",
           where: whereConditionQualification,
           required: qualificationRequired,
-          through: { attributes: [] }, // prevent including join table info
+          through: { attributes: [ "is_signed_off" ] }, // prevent including join table info
         },
         {
           model: User,
@@ -474,6 +474,25 @@ class LearnerService {
         distinct: true,
       });
       userData_ = JSON.parse(JSON.stringify(userData_));
+      // Flatten qualifications with Promise.all
+      if (userData_ && userData_.rows?.length) {
+        userData_.rows = await Promise.all(
+          userData_.rows.map(async (user: any) => {
+            if (user.qualifications?.length) {
+              user.qualifications = await Promise.all(
+                user.qualifications.map(async (q: any) => {
+                  const { tbl_user_qualification, ...rest } = q; // remove join object
+                  return {
+                    ...rest,
+                    is_signed_off: tbl_user_qualification?.is_signed_off ?? null,
+                  };
+                })
+              );
+            }
+            return user;
+          })
+        );
+      }
       const pagination = await paginate(userData_, limit, page, fetchAll);
       const response = {
         data: userData_.rows,
@@ -514,7 +533,7 @@ class LearnerService {
             model: Qualifications,
             as: "qualifications",
             required: false,
-            through: { attributes: [] }, // prevent including join table info
+            through: { attributes: [ "is_signed_off" ] }, // prevent including join table info
           },
           {
             model: User,
@@ -536,6 +555,24 @@ class LearnerService {
           },
         ],
       });
+      isValidUser = JSON.parse(JSON.stringify(isValidUser));
+      //@ts-ignore
+      if (isValidUser && isValidUser.qualifications?.length) {
+        //@ts-ignore
+        isValidUser.qualifications = await Promise.all(
+          //@ts-ignore
+          isValidUser.qualifications.map(async (q: any) => {
+            const { tbl_user_qualification, UserQualification, ...rest } = q; // strip join table objects
+            return {
+              ...rest,
+              is_signed_off:
+                tbl_user_qualification?.is_signed_off ??
+                UserQualification?.is_signed_off ??
+                null,
+            };
+          })
+        );
+      }
       return {
         status: STATUS_CODES.SUCCESS,
         data: isValidUser,

@@ -91,6 +91,13 @@ class MasterService {
           message: "Qualification not found",
         };
       }
+      // Check if user has do already signed Off throw an error
+      if (userQualification.is_signed_off && data.is_sign_off == 1) {
+        return {
+          status: STATUS_CODES.BAD_REQUEST,
+          message: "Qualification already signed off",
+        };
+      }
       await userQualification.update({ is_signed_off: data.is_sign_off });
       return {
         status: STATUS_CODES.SUCCESS,

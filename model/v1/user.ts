@@ -11,6 +11,7 @@ import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
 import Center from "../../database/schema/center";
 import Role from "../../database/schema/role";
+import UserQualification from "../../database/schema/user_qualification";
 const jwtSecret = process.env.JWT_SECRET || "";
 const AccessTokenExpiration = process.env.ACCESS_TOKEN_EXPIRATION || "";
 
@@ -47,7 +48,7 @@ class userAuthService {
       { login_token: loginToken },
       { where: { id: isUser.id } }
     );
-    const userData = await User.findUserData(isUser.id);
+    let userData = await User.findUserData(isUser.id);
     // Check login user is Super Admin
     if (userData.role == Roles.SUPER_ADMIN) {
       // check if user has default center or not id not then assign default center
@@ -64,6 +65,24 @@ class userAuthService {
           userData.default_center_id = defaultCenter.id; // Update userData with new center
         }
       }
+    }
+    if (userData.role == Roles.LEARNER) {
+      userData = JSON.parse(JSON.stringify(userData))
+      userData.qualifications = await Promise.all(
+        //@ts-ignore
+        userData.qualifications.map(async (q: any) => {
+          let userQualification = await UserQualification.findOne({
+            where: { user_id: userData.id, qualification_id: q.id },
+            attributes: ["is_signed_off"],
+            raw: true,
+          });
+      
+          return {
+            ...q,
+            is_signed_off: userQualification ? userQualification.is_signed_off : null,
+          };
+        })
+      );
     }
     return {
       data: userData,
