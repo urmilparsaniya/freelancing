@@ -244,8 +244,8 @@ class ModuleRecordsService {
         deletedAt: null,
       };
 
-      if (userData.center_id) {
-        whereClause.center_id = userData.center_id;
+      if (data.center_id) {
+        whereClause.center_id = data.center_id;
       }
 
       if (data.module_type) {

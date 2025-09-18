@@ -36,4 +36,18 @@ router
   .route("/update")
   .put(authenticateUser, userAuthController.updateUserProfile);
 
+// Update Password
+router
+  .route("/update-password")
+  .put(
+    authenticateUser,
+    validate([
+      body("password")
+        .trim()
+        .notEmpty()
+        .withMessage("Password Required"),
+    ]),
+    userAuthController.updatePassword
+  );
+
 export default router;

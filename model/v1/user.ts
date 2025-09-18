@@ -130,6 +130,47 @@ class userAuthService {
       message: STATUS_MESSAGE.USER.USER_UPDATED,
     };
   }
+  
+  // Update Password
+  static async updatePassword(
+    data: any,
+    userData: userAuthenticationData
+  ): Promise<AuthResponse> {
+    // check if valid user
+    let isUser = await User.findOne({
+      where: {
+        id: userData.id,
+        deletedAt: null,
+      },
+    });
+    if (!isUser) {
+      // Check if in data pass token
+      if (data.token) {
+        // Decode jwt token
+        let decoded = jwt.verify(data.token, jwtSecret);
+        // check if user exist 
+        isUser = await User.findOne({
+          where: { id: decoded.id }
+        })
+        if (!isUser) {
+          return {
+            status: STATUS_CODES.NOT_FOUND,
+            message: STATUS_MESSAGE.USER.ERROR_MESSAGE.USER_NOT_FOUND,
+          };
+        }
+      }
+    }
+    
+    // update password
+    await User.update(
+      { password: data.password },
+      { where: { id: isUser.id } }
+    );
+    return {
+      status: STATUS_CODES.SUCCESS,
+      message: "Password Updated Successfully",
+    };
+  }
 }
 
 export default userAuthService;

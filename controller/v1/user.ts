@@ -60,6 +60,27 @@ class userAuthController {
       res.handler.serverError(error);
     }
   }
+
+  // Update Password
+  static async updatePassword(req: Request, res: Response): Promise<void> {
+    try {
+      let data: UserInterface = req.body;
+      let userData = req.headers["user_info"] as userAuthenticationData;
+      let request = await userAuthService.updatePassword(data, userData);
+      if (request.status !== STATUS_CODES.SUCCESS) {
+        res.handler.errorResponse(request.status, request.message);
+        return;
+      }
+      res.handler.successResponse(
+        request.status,
+        request.data,
+        request.message
+      );
+    } catch (error) {
+      error = "server error";
+      res.handler.serverError(error);
+    }
+  }
 }
 
 export default userAuthController;

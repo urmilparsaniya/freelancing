@@ -224,7 +224,8 @@ class LearnerService {
           qualificationIds.map((qid) => ({
             user_id: +learnerId,
             qualification_id: qid,
-          }))
+          })),
+          { transaction }
         );
       }
 
@@ -259,7 +260,8 @@ class LearnerService {
           assessorIds.map((assessorId) => ({
             user_id: +learnerId,
             assessor_id: assessorId,
-          }))
+          })),
+          { transaction }
         );
       }
 
@@ -294,7 +296,8 @@ class LearnerService {
           iqaIds.map((iqaId) => ({
             user_id: +learnerId,
             iqa_id: iqaId,
-          }))
+          })),
+          { transaction }
         );
       }
 
@@ -305,6 +308,7 @@ class LearnerService {
         message: "Learner Updated Successfully",
       };
     } catch (error) {
+      console.log(error)
       await transaction.rollback();
       return {
         status: STATUS_CODES.SERVER_ERROR,
