@@ -99,9 +99,56 @@ class MasterService {
         };
       }
       await userQualification.update({ is_signed_off: data.is_sign_off });
+      let learner_ = await User.findOne({
+        where: { id: data.learner_id, deletedAt: null },
+        include: [
+          {
+            model: Qualifications,
+            as: "qualifications",
+            required: false,
+            through: { attributes: [ "is_signed_off" ] }, // prevent including join table info
+          },
+          {
+            model: User,
+            as: "assessors",
+            required: false,
+            through: { attributes: [] },
+          },
+          {
+            model: User,
+            as: "iqas",
+            required: false,
+            through: { attributes: [] },
+          },
+          {
+            model: Center,
+            as: "center",
+            required: false,
+            attributes: ["id", "center_name", "center_address"],
+          },
+        ],
+      });
+      learner_ = JSON.parse(JSON.stringify(learner_));
+      //@ts-ignore
+      if (learner_ && learner_.qualifications?.length) {
+        //@ts-ignore
+        learner_.qualifications = await Promise.all(
+          //@ts-ignore
+          learner_.qualifications.map(async (q: any) => {
+            const { tbl_user_qualification, UserQualification, ...rest } = q; // strip join table objects
+            return {
+              ...rest,
+              is_signed_off:
+                tbl_user_qualification?.is_signed_off ??
+                UserQualification?.is_signed_off ??
+                null,
+            };
+          })
+        );
+      } 
       return {
         status: STATUS_CODES.SUCCESS,
-        data: null,
+        data: learner_,
         message: "Qualification signed off successfully",
       };
     } catch (error) {
