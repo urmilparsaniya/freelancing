@@ -13,8 +13,10 @@ import {
 } from "@aws-sdk/client-s3";
 import NodeCache from "node-cache";
 import { userAuthenticationData } from "../interface/user";
-import { Sequelize } from "sequelize";
+import { Sequelize, Transaction } from "sequelize";
 import Center from "../database/schema/center";
+import { ActivityInterface } from "../interface/activity";
+import Activity from "../database/schema/activity";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION_NAME,
@@ -487,4 +489,15 @@ export const splitFileIntoChunks = (
   }
 
   return chunks;
+};
+
+// Activity Create
+export const activityCreate = async (data, t?: Transaction) => {
+  try {
+    const activity = await Activity.create(data);
+    return activity;
+  } catch (error) {
+    console.error("Error creating activity:", error);
+    // throw error;
+  }
 };

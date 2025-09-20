@@ -11,6 +11,8 @@ import Role from "../../database/schema/role";
 import Center from "../../database/schema/center";
 import Methods from "../../database/schema/methods";
 import Assessment from "../../database/schema/assessment";
+import ModuleRecords from "../../database/schema/modules_records";
+import Activity from "../../database/schema/activity";
 const { sequelize } = require("../../configs/database");
 
 class MasterService {
@@ -163,232 +165,255 @@ class MasterService {
   // Get Dashboard method
   static async getDashboard(data: any, userData: userAuthenticationData): Promise<any> {
     try {
-      // Check if user is admin (role = 1), if not, return empty response
       if (userData.role !== 7) {
         return {
           status: STATUS_CODES.SUCCESS,
           message: STATUS_MESSAGE.DASHBOARD.DASHBOARD_DATA,
           data: {
             overview: {
-              totalLearners: 0,
-              activeAssessors: 0,
-              iqasSupervising: 0,
-              qualifications: 0,
-              totalAssessments: 0,
-              completed: 0,
-              pendingReview: 0,
-              successRate: 0
+              totalLearners: { value: 0, change: 0, note: "+0% from last month" },
+              activeAssessors: { value: 0, change: 0, note: "0 new this week" },
+              iqasSupervising: { value: 0, change: 0, note: "All assigned" },
+              qualifications: { value: 0, change: 0, note: "0 added recently" },
+              totalAssessments: { value: 0, change: 0, note: "+0% this month" },
+              completed: { value: 0, rate: 0, note: "0% completion rate" },
+              pendingReview: { value: 0, note: "Needs attention" },
+              successRate: { value: 0, change: 0, note: "+0% improvement" }
             },
             monthlyOverview: [],
             statusDistribution: [],
-            recentActivity: []
+            recentActivity: [],
+            recentResource: []
           }
         };
       }
-
-      const { Op } = require('sequelize');
+  
+      const { Op } = require("sequelize");
       const currentDate = new Date();
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(currentDate.getMonth() - 6);
-
-      // Get all required data in parallel
+  
+      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const startOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+  
+      const startOfWeek = new Date(currentDate);
+      startOfWeek.setDate(currentDate.getDate() - currentDate.getDay()); // start Sunday
+      const startOfLastWeek = new Date(startOfWeek);
+      startOfLastWeek.setDate(startOfWeek.getDate() - 7);
+      const endOfLastWeek = new Date(startOfWeek);
+      endOfLastWeek.setDate(startOfWeek.getDate() - 1);
+  
+      // Parallel queries
       const [
         totalLearners,
+        learnersThisMonth,
+        learnersLastMonth,
         activeAssessors,
+        assessorsThisWeek,
+        assessorsLastWeek,
         iqasSupervising,
         qualifications,
+        newQualifications,
         totalAssessments,
+        assessmentsThisMonth,
+        assessmentsLastMonth,
         completedAssessments,
         pendingReviewAssessments,
         monthlyData,
         statusDistribution,
-        recentActivity
+        recentActivity,
+        recentResource
       ] = await Promise.all([
-        // Total Learners (role = 3)
+        // Learners total
+        User.count({ where: { role: Roles.LEARNER, deletedAt: null } }),
+        // Learners this month
         User.count({
-          where: { 
-            role: 3,
-            deletedAt: null 
-          }
+          where: { role: Roles.LEARNER, deletedAt: null, createdAt: { [Op.gte]: startOfMonth } }
         }),
-
-        // Active Assessors (role = 2)
+        // Learners last month
         User.count({
-          where: { 
-            role: 2,
-            deletedAt: null 
-          }
+          where: { role: Roles.LEARNER, deletedAt: null, createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] } }
         }),
-
-        // IQAs Supervising (role = 4 or specific IQA role)
+  
+        // Active assessors total
+        User.count({ where: { role: Roles.ASSESSOR, deletedAt: null } }),
+        // Assessors this week
         User.count({
-          where: { 
-            role: 4,
-            deletedAt: null 
-          }
+          where: { role: Roles.ASSESSOR, deletedAt: null, createdAt: { [Op.gte]: startOfWeek } }
         }),
-
-        // Total Qualifications
+        // Assessors last week
+        User.count({
+          where: { role: Roles.ASSESSOR, deletedAt: null, createdAt: { [Op.between]: [startOfLastWeek, endOfLastWeek] } }
+        }),
+  
+        // IQAs supervising
+        User.count({ where: { role: Roles.IQA, deletedAt: null } }),
+  
+        // Qualifications total
+        Qualifications.count({ where: { deletedAt: null, status: 1 } }),
+        // Newly added qualifications this month
         Qualifications.count({
-          where: { 
-            deletedAt: null,
-            status: 1
-          }
+          where: { deletedAt: null, status: 1, createdAt: { [Op.gte]: startOfMonth } }
         }),
-
-        // Total Assessments
+  
+        // Total assessments
+        Assessment.count({ where: { deletedAt: null } }),
+        // Assessments this month
+        Assessment.count({ where: { deletedAt: null, createdAt: { [Op.gte]: startOfMonth } } }),
+        // Assessments last month
         Assessment.count({
-          where: { 
-            deletedAt: null 
-          }
+          where: { deletedAt: null, createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] } }
         }),
-
-        // Completed Assessments (assessment_status = 4)
-        Assessment.count({
-          where: { 
-            assessment_status: 4,
-            deletedAt: null 
-          }
-        }),
-
-        // Pending Review Assessments (assessment_status = 2 or 5)
-        Assessment.count({
-          where: { 
-            assessment_status: { [Op.in]: [2, 5] },
-            deletedAt: null 
-          }
-        }),
-
-        // Monthly Assessment Overview (last 6 months)
+  
+        // Completed
+        Assessment.count({ where: { assessment_status: 4, deletedAt: null } }),
+  
+        // Pending review
+        Assessment.count({ where: { assessment_status: { [Op.in]: [2, 5] }, deletedAt: null } }),
+  
+        // Monthly data (6 months)
         Assessment.findAll({
           attributes: [
-            [sequelize.fn('DATE_FORMAT', sequelize.col('createdAt'), '%Y-%m'), 'month'],
-            [sequelize.fn('COUNT', sequelize.col('id')), 'submissions'],
-            [sequelize.fn('COUNT', sequelize.literal('CASE WHEN assessment_status = 4 THEN 1 END')), 'completions']
+            [sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m"), "month"],
+            [sequelize.fn("COUNT", sequelize.col("id")), "submissions"],
+            [sequelize.fn("COUNT", sequelize.literal("CASE WHEN assessment_status = 4 THEN 1 END")), "completions"]
           ],
-          where: {
-            createdAt: {
-              [Op.gte]: sixMonthsAgo
-            },
-            deletedAt: null
-          },
-          group: [sequelize.fn('DATE_FORMAT', sequelize.col('createdAt'), '%Y-%m')],
-          order: [[sequelize.fn('DATE_FORMAT', sequelize.col('createdAt'), '%Y-%m'), 'ASC']],
+          where: { createdAt: { [Op.gte]: sixMonthsAgo }, deletedAt: null },
+          group: [sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m")],
+          order: [[sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m"), "ASC"]],
           raw: true
         }),
-
-        // Assessment Status Distribution
+  
+        // Status distribution
         Assessment.findAll({
-          attributes: [
-            'assessment_status',
-            [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-          ],
-          where: {
-            deletedAt: null
-          },
-          group: ['assessment_status'],
+          attributes: ["assessment_status", [sequelize.fn("COUNT", sequelize.col("id")), "count"]],
+          where: { deletedAt: null },
+          group: ["assessment_status"],
           raw: true
         }),
+  
+        // Recent activity
+        Activity.findAll({
+          where: { center_id: userData.center_id },
+          order: [["createdAt", "DESC"]],
+          limit: 10
+        }),
 
-        // Recent Activity (last 10 activities)
-        Assessment.findAll({
-          attributes: ['id', 'title', 'assessment_status', 'createdAt', 'assessor_id'],
-          include: [
-            {
-              model: User,
-              as: 'assessor',
-              attributes: ['id', 'name', 'surname'],
-              required: false
-            }
-          ],
-          where: {
-            deletedAt: null
-          },
-          order: [['createdAt', 'DESC']],
+        // Recent Resource
+        ModuleRecords.findAll({
+          where: { center_id: userData.center_id },
+          order: [["createdAt", "DESC"]],
           limit: 10
         })
       ]);
 
-      // Calculate success rate
-      const successRate = totalAssessments > 0 ? ((completedAssessments / totalAssessments) * 100).toFixed(1) : 0;
-
-      // Process monthly data
+      // Percentages
+      const learnerChange =
+        learnersLastMonth > 0 ? ((learnersThisMonth - learnersLastMonth) / learnersLastMonth) * 100 : 100;
+  
+      const assessorChange =
+        assessorsLastWeek > 0 ? ((assessorsThisWeek - assessorsLastWeek) / assessorsLastWeek) * 100 : 100;
+  
+      const assessmentChange =
+        assessmentsLastMonth > 0 ? ((assessmentsThisMonth - assessmentsLastMonth) / assessmentsLastMonth) * 100 : 100;
+  
+      const successRate = totalAssessments > 0 ? (completedAssessments / totalAssessments) * 100 : 0;
+      const successChange =
+        assessmentsLastMonth > 0
+          ? (((completedAssessments / totalAssessments) * 100) - ((assessmentsLastMonth > 0 ? (assessmentsLastMonth / totalAssessments) * 100 : 0)))
+          : 0;
+  
+      // Prepare monthly overview
       const monthlyOverview = [];
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      
+      const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       for (let i = 5; i >= 0; i--) {
         const date = new Date();
         date.setMonth(date.getMonth() - i);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
         const monthData = monthlyData.find((m: any) => m.month === monthKey) as any;
-        
         monthlyOverview.push({
           month: monthNames[date.getMonth()],
           submissions: monthData ? parseInt(monthData.submissions) : 0,
           completions: monthData ? parseInt(monthData.completions) : 0
         });
       }
-
-      // Process status distribution
+  
+      // Status map
       const statusMap = {
-        1: { label: 'Created', color: '#3B82F6' },
-        2: { label: 'Evidence Submitted', color: '#3B82F6' },
-        3: { label: 'Under Review', color: '#F59E0B' },
-        4: { label: 'Completed', color: '#10B981' },
-        5: { label: 'With IQA', color: '#8B5CF6' },
-        6: { label: 'IQA Approved', color: '#10B981' }
+        1: { label: "Created", color: "#3B82F6" },
+        2: { label: "Evidence Submitted", color: "#3B82F6" },
+        3: { label: "Under Review", color: "#F59E0B" },
+        4: { label: "Completed", color: "#10B981" },
+        5: { label: "With IQA", color: "#8B5CF6" },
+        6: { label: "IQA Approved", color: "#10B981" }
       };
-
+  
       const processedStatusDistribution = statusDistribution.map((item: any) => ({
-        status: statusMap[item.assessment_status]?.label || 'Unknown',
+        status: statusMap[item.assessment_status]?.label || "Unknown",
         count: parseInt(item.count),
-        color: statusMap[item.assessment_status]?.color || '#6B7280'
+        color: statusMap[item.assessment_status]?.color || "#6B7280"
       }));
-
-      // Process recent activity
-      const processedRecentActivity = recentActivity.map((activity: any) => {
-        const timeAgo = this.getTimeAgo(activity.createdAt);
-        const statusText = statusMap[activity.assessment_status]?.label || 'Unknown';
-        
-        return {
-          id: activity.id,
-          title: activity.title,
-          user: activity.assessor ? `${activity.assessor.name} ${activity.assessor.surname}` : 'Unknown User',
-          action: this.getActivityAction(activity.assessment_status),
-          timeAgo: timeAgo,
-          status: statusText,
-          statusColor: statusMap[activity.assessment_status]?.color || '#6B7280'
-        };
-      });
-
+  
       return {
         status: STATUS_CODES.SUCCESS,
         message: STATUS_MESSAGE.DASHBOARD.DASHBOARD_DATA,
         data: {
           overview: {
-            totalLearners: totalLearners,
-            activeAssessors: activeAssessors,
-            iqasSupervising: iqasSupervising,
-            qualifications: qualifications,
-            totalAssessments: totalAssessments,
-            completed: completedAssessments,
-            pendingReview: pendingReviewAssessments,
-            successRate: parseFloat(successRate.toString())
+            totalLearners: {
+              value: totalLearners,
+              change: parseFloat(learnerChange.toFixed(1)),
+              note: `${learnerChange >= 0 ? "+" : ""}${learnerChange.toFixed(1)}% from last month`
+            },
+            activeAssessors: {
+              value: activeAssessors,
+              change: assessorsThisWeek,
+              note: `${assessorsThisWeek} new this week`
+            },
+            iqasSupervising: {
+              value: iqasSupervising,
+              change: 0,
+              note: "All assigned"
+            },
+            qualifications: {
+              value: qualifications,
+              change: newQualifications,
+              note: `${newQualifications} added recently`
+            },
+            totalAssessments: {
+              value: totalAssessments,
+              change: parseFloat(assessmentChange.toFixed(1)),
+              note: `${assessmentChange >= 0 ? "+" : ""}${assessmentChange.toFixed(1)}% this month`
+            },
+            completed: {
+              value: completedAssessments,
+              rate: ((completedAssessments / totalAssessments) * 100).toFixed(1),
+              note: `${((completedAssessments / totalAssessments) * 100).toFixed(1)}% completion rate`
+            },
+            pendingReview: {
+              value: pendingReviewAssessments,
+              note: "Needs attention"
+            },
+            successRate: {
+              value: parseFloat(successRate.toFixed(1)),
+              change: parseFloat(successChange.toFixed(1)),
+              note: `${successChange >= 0 ? "+" : ""}${successChange.toFixed(1)}% improvement`
+            }
           },
-          monthlyOverview: monthlyOverview,
+          monthlyOverview,
           statusDistribution: processedStatusDistribution,
-          recentActivity: processedRecentActivity
+          recentActivity: recentActivity,
+          recentResource: recentResource
         }
       };
-
     } catch (error) {
       console.log(error);
       return {
         status: STATUS_CODES.SERVER_ERROR,
-        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR,
+        message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR
       };
     }
-  }
+  }  
 
   // Helper method to calculate time ago
   private static getTimeAgo(date: Date): string {

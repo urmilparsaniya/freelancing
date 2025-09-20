@@ -247,6 +247,9 @@ class ModuleRecordsService {
       if (data.center_id) {
         whereClause.center_id = data.center_id;
       }
+      //  else {
+      //   whereClause.center_id = userData.center_id;
+      // }
 
       if (data.module_type) {
         whereClause.module_type = +data.module_type;

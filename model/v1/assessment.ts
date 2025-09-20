@@ -22,6 +22,7 @@ import {
   completeChunkUpload,
   abortChunkUpload,
   splitFileIntoChunks,
+  activityCreate,
 } from "../../helper/utils";
 import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
@@ -44,6 +45,7 @@ import AssessmentNoteFiles from "../../database/schema/assessment_note_files";
 import AssessmentMarks from "../../database/schema/assessment_marks";
 import SubOutcomes from "../../database/schema/sub_outcomes";
 import OutcomeSubpoints from "../../database/schema/outcome_subpoints";
+import { ActivityInterface } from "../../interface/activity";
 
 class AssessmentService {
   /**
@@ -321,7 +323,14 @@ class AssessmentService {
           };
         }
       }
-
+      // Activity Create
+      let activity = {
+        activity: `created an assessment ${assessment.title}`,
+        user_id: userData.id,
+        activity_status: "Created",
+        center_id: userData.center_id
+      }
+      await activityCreate(activity, transaction)
       await transaction.commit();
       return {
         status: STATUS_CODES.SUCCESS,
@@ -944,6 +953,15 @@ class AssessmentService {
       }
       try {
         await assessment.update(data, { transaction });
+        await activityCreate(
+          {
+            activity: `submitted evidence for ${assessment.title}`,
+            user_id: userData.id,
+            activity_status: "Submitted",
+            center_id: userData.center_id
+          },
+          transaction
+        )
       } catch (updateError) {
         console.error("Error updating assessment:", updateError);
         await transaction.rollback();
@@ -1208,6 +1226,17 @@ class AssessmentService {
             transaction,
           });
 
+          // Activity Create
+          await activityCreate(
+            {
+              user_id: userData_.id,
+              activity: `rejected assessment ${assessment.title}`,
+              activity_status: "Rejected",
+              center_id: userData_.center_id
+            },
+            transaction
+          );
+
           console.log(
             `Deleted ${deletedMarks} assessment mark entries due to IQA rejection`
           );
@@ -1318,6 +1347,47 @@ class AssessmentService {
             status: STATUS_CODES.SERVER_ERROR,
             message: "Error updating assessment mark",
           };
+        }
+      }
+
+      // Activity Create For Assessment Accepted by Assessor, IQA Agreed and IQA not Agreed for
+      if (
+        data.assessment_status === AssessmentStatus.ASSESSMENT_COMPLETED ||
+        data.assessment_status === AssessmentStatus.AGREED_BY_IQA ||
+        data.assessment_status === AssessmentStatus.NOT_AGREED_BY_IQA
+      ) {
+        if (data.assessment_status === AssessmentStatus.ASSESSMENT_COMPLETED) {
+          await activityCreate(
+            {
+              user_id: userData_.id,
+              activity: `approved criteria for ${assessment.title}`,
+              activity_status: "Assessor Approved",
+              center_id: userData_.center_id
+            },
+            transaction
+          );
+        }
+        if (data.assessment_status === AssessmentStatus.AGREED_BY_IQA) {
+          await activityCreate(
+            {
+              user_id: userData_.id,
+              activity: `approved criteria for ${assessment.title}`,
+              activity_status: "IQA Approved",
+              center_id: userData_.center_id
+            },
+            transaction
+          );
+        }
+        if (data.assessment_status === AssessmentStatus.NOT_AGREED_BY_IQA) {
+          await activityCreate(
+            {
+              user_id: userData_.id,
+              activity: `rejected criteria for ${assessment.title}`,
+              activity_status: "IQA Rejected",
+              center_id: userData_.center_id
+            },
+            transaction
+          );
         }
       }
 
