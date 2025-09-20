@@ -296,6 +296,11 @@ class MasterService {
         // Recent activity
         Activity.findAll({
           where: { center_id: userData.center_id },
+          include: {
+            model: User,
+            as: "user",
+            attributes: ["id", "name", "surname", "email"]
+          },
           order: [["createdAt", "DESC"]],
           limit: 10
         }),

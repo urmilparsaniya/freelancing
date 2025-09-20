@@ -6,6 +6,7 @@ import { TABLE_NAME } from "../../configs/tables";
 import { ModuleRecordsInterface } from "../../interface/modules_records";
 import Image from "./images";
 import { Entity } from "../../configs/constants";
+import User from "./user";
 
 class ModuleRecords
   extends Model<ModuleRecordsInterface>
@@ -65,11 +66,11 @@ ModuleRecords.init(
 );
 
 ModuleRecords.hasMany(Image, {
-    foreignKey: "entity_id",
-    as: "images_module_records",
-    scope: {
-      entity_type: Entity.MODULE_RECORDS
-    }
-})
+  foreignKey: "entity_id",
+  as: "images_module_records",
+  scope: {
+    entity_type: Entity.MODULE_RECORDS,
+  },
+});
 
 export default ModuleRecords
