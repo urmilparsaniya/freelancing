@@ -46,6 +46,7 @@ import AssessmentMarks from "../../database/schema/assessment_marks";
 import SubOutcomes from "../../database/schema/sub_outcomes";
 import OutcomeSubpoints from "../../database/schema/outcome_subpoints";
 import { ActivityInterface } from "../../interface/activity";
+import Role from "../../database/schema/role";
 
 class AssessmentService {
   /**
@@ -324,11 +325,16 @@ class AssessmentService {
         }
       }
       // Activity Create
+      let role = await Role.findOne({
+        where: { id: userData.role },
+        attributes: ["role_slug"],
+      })
       let activity = {
-        activity: `created an assessment ${assessment.title}`,
+        activity: assessment.title,
         user_id: userData.id,
-        activity_status: "Created",
-        center_id: userData.center_id
+        activity_status: AssessmentStatus.ASSESSMENT_CREATE,
+        center_id: userData.center_id,
+        role: role.role_slug,
       }
       await activityCreate(activity, transaction)
       await transaction.commit();
@@ -360,7 +366,7 @@ class AssessmentService {
       if ("id" in data) {
         delete data.id;
       }
-      
+
       // Check if Logged in user is not from admin | assessor throw an error
       let userData_ = await User.findOne({
         where: { id: userData.id },
@@ -505,17 +511,17 @@ class AssessmentService {
       }
 
       const fileIds = [];
-      
+
       // Handle file uploads with chunk upload
       if (files && files.length > 0) {
         for (const file of files) {
           try {
             const extension = extname(file.originalname);
             const mainFileName = `assessment/${uuidv4()}${extension}`;
-            
+
             // Initialize chunk upload
             const initResult = await initChunkUpload(mainFileName, file.mimetype);
-            
+
             if (initResult.status !== 1) {
               await transaction.rollback();
               return {
@@ -603,10 +609,10 @@ class AssessmentService {
           try {
             const extension = extname(learnerFile.originalname);
             const mainFileName = `learner/${uuidv4()}${extension}`;
-            
+
             // Initialize chunk upload
             const initResult = await initChunkUpload(mainFileName, learnerFile.mimetype);
-            
+
             if (initResult.status !== 1) {
               await transaction.rollback();
               return {
@@ -752,11 +758,11 @@ class AssessmentService {
       mimeType === "application/pdf" ||
       mimeType === "application/msword" ||
       mimeType ===
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       mimeType ===
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
       mimeType ===
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     ) {
       return EntityType.DOCUMENT;
     }
@@ -953,12 +959,17 @@ class AssessmentService {
       }
       try {
         await assessment.update(data, { transaction });
+        let role = await Role.findOne({
+          where: { id: userData.role },
+          attributes: ["role_slug"],
+        })
         await activityCreate(
           {
-            activity: `submitted evidence for ${assessment.title}`,
+            activity: assessment.title,
             user_id: userData.id,
-            activity_status: "Submitted",
-            center_id: userData.center_id
+            activity_status: AssessmentStatus.LEARNER_AGREED,
+            center_id: userData.center_id,
+            role: role.role_slug
           },
           transaction
         )
@@ -1225,14 +1236,18 @@ class AssessmentService {
             force: true, // Hard delete
             transaction,
           });
-
+          let role = await Role.findOne({
+            where: { id: userData.role },
+            attributes: ["role_slug"],
+          })
           // Activity Create
           await activityCreate(
             {
               user_id: userData_.id,
-              activity: `rejected assessment ${assessment.title}`,
-              activity_status: "Rejected",
-              center_id: userData_.center_id
+              activity: assessment.title,
+              activity_status: AssessmentStatus.ASSESSOR_REJECT,
+              center_id: userData_.center_id,
+              role: role.role_slug
             },
             transaction
           );
@@ -1349,7 +1364,10 @@ class AssessmentService {
           };
         }
       }
-
+      let role = await Role.findOne({
+        where: { id: userData.role },
+        attributes: ["role_slug"],
+      })
       // Activity Create For Assessment Accepted by Assessor, IQA Agreed and IQA not Agreed for
       if (
         data.assessment_status === AssessmentStatus.ASSESSMENT_COMPLETED ||
@@ -1360,9 +1378,10 @@ class AssessmentService {
           await activityCreate(
             {
               user_id: userData_.id,
-              activity: `approved criteria for ${assessment.title}`,
-              activity_status: "Assessor Approved",
-              center_id: userData_.center_id
+              activity: assessment.title,
+              activity_status: AssessmentStatus.ASSESSMENT_COMPLETED,
+              center_id: userData_.center_id,
+              role: role.role_slug
             },
             transaction
           );
@@ -1371,9 +1390,10 @@ class AssessmentService {
           await activityCreate(
             {
               user_id: userData_.id,
-              activity: `approved criteria for ${assessment.title}`,
-              activity_status: "IQA Approved",
-              center_id: userData_.center_id
+              activity: assessment.title,
+              activity_status: AssessmentStatus.AGREED_BY_IQA,
+              center_id: userData_.center_id,
+              role: role.role_slug
             },
             transaction
           );
@@ -1382,9 +1402,10 @@ class AssessmentService {
           await activityCreate(
             {
               user_id: userData_.id,
-              activity: `rejected criteria for ${assessment.title}`,
-              activity_status: "IQA Rejected",
-              center_id: userData_.center_id
+              activity: assessment.title,
+              activity_status: AssessmentStatus.AGREED_BY_IQA,
+              center_id: userData_.center_id,
+              role: role.role_slug
             },
             transaction
           );
@@ -1804,6 +1825,20 @@ class AssessmentService {
         force: true,
         transaction,
       });
+      let role = await Role.findOne({
+        where: { id: userData.role },
+        attributes: ["role_slug"],
+      })
+      // Delete Assessment Activity
+      await activityCreate(
+        {
+          activity: assessment.title,
+          user_id: userData.id,
+          activity_status: AssessmentStatus.ASSESSMENT_DELETE,
+          center_id: userData.center_id,
+          role: role.role_slug
+        }
+      )
 
       await transaction.commit();
       return {

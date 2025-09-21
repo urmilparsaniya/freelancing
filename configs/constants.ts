@@ -207,7 +207,8 @@ export const AssessmentStatus = {
   ASSESSOR_REJECT: 3,
   ASSESSMENT_COMPLETED: 4,
   NOT_AGREED_BY_IQA: 5,
-  AGREED_BY_IQA: 6
+  AGREED_BY_IQA: 6,
+  ASSESSMENT_DELETE: 12
 }
 
 export const RoleSlug = {

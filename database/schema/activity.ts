@@ -12,6 +12,7 @@ class Activity extends Model<ActivityInterface> implements ActivityInterface {
   public activity: string;
   public activity_status: string;
   public center_id: number;
+  public role: string;
   // timestamps!
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -36,7 +37,11 @@ Activity.init(
     center_id: {
       type: DataTypes.NUMBER,
       allowNull: true,
-    }
+    },
+    role: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   },
   {
     ...BaseModel.initBaseOptions(sequelize),
