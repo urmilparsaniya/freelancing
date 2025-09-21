@@ -108,7 +108,7 @@ class MasterService {
             model: Qualifications,
             as: "qualifications",
             required: false,
-            through: { attributes: [ "is_signed_off" ] }, // prevent including join table info
+            through: { attributes: ["is_signed_off"] }, // prevent including join table info
           },
           {
             model: User,
@@ -147,7 +147,7 @@ class MasterService {
             };
           })
         );
-      } 
+      }
       return {
         status: STATUS_CODES.SUCCESS,
         data: learner_,
@@ -187,23 +187,23 @@ class MasterService {
           }
         };
       }
-  
+
       const { Op } = require("sequelize");
       const currentDate = new Date();
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(currentDate.getMonth() - 6);
-  
+
       const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const startOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
       const endOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
-  
+
       const startOfWeek = new Date(currentDate);
       startOfWeek.setDate(currentDate.getDate() - currentDate.getDay()); // start Sunday
       const startOfLastWeek = new Date(startOfWeek);
       startOfLastWeek.setDate(startOfWeek.getDate() - 7);
       const endOfLastWeek = new Date(startOfWeek);
       endOfLastWeek.setDate(startOfWeek.getDate() - 1);
-  
+
       // Parallel queries
       const [
         totalLearners,
@@ -235,7 +235,7 @@ class MasterService {
         User.count({
           where: { role: Roles.LEARNER, deletedAt: null, createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] } }
         }),
-  
+
         // Active assessors total
         User.count({ where: { role: Roles.ASSESSOR, deletedAt: null } }),
         // Assessors this week
@@ -246,17 +246,17 @@ class MasterService {
         User.count({
           where: { role: Roles.ASSESSOR, deletedAt: null, createdAt: { [Op.between]: [startOfLastWeek, endOfLastWeek] } }
         }),
-  
+
         // IQAs supervising
         User.count({ where: { role: Roles.IQA, deletedAt: null } }),
-  
+
         // Qualifications total
         Qualifications.count({ where: { deletedAt: null, status: 1 } }),
         // Newly added qualifications this month
         Qualifications.count({
           where: { deletedAt: null, status: 1, createdAt: { [Op.gte]: startOfMonth } }
         }),
-  
+
         // Total assessments
         Assessment.count({ where: { deletedAt: null } }),
         // Assessments this month
@@ -265,13 +265,13 @@ class MasterService {
         Assessment.count({
           where: { deletedAt: null, createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] } }
         }),
-  
+
         // Completed
         Assessment.count({ where: { assessment_status: 4, deletedAt: null } }),
-  
+
         // Pending review
         Assessment.count({ where: { assessment_status: { [Op.in]: [2, 5] }, deletedAt: null } }),
-  
+
         // Monthly data (6 months)
         Assessment.findAll({
           attributes: [
@@ -284,7 +284,7 @@ class MasterService {
           order: [[sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m"), "ASC"]],
           raw: true
         }),
-  
+
         // Status distribution
         Assessment.findAll({
           attributes: ["assessment_status", [sequelize.fn("COUNT", sequelize.col("id")), "count"]],
@@ -292,7 +292,7 @@ class MasterService {
           group: ["assessment_status"],
           raw: true
         }),
-  
+
         // Recent activity
         Activity.findAll({
           where: { center_id: userData.center_id },
@@ -313,25 +313,33 @@ class MasterService {
         })
       ]);
 
-      // Percentages
-      const learnerChange =
-        learnersLastMonth > 0 ? ((learnersThisMonth - learnersLastMonth) / learnersLastMonth) * 100 : 100;
-  
-      const assessorChange =
-        assessorsLastWeek > 0 ? ((assessorsThisWeek - assessorsLastWeek) / assessorsLastWeek) * 100 : 100;
-  
-      const assessmentChange =
-        assessmentsLastMonth > 0 ? ((assessmentsThisMonth - assessmentsLastMonth) / assessmentsLastMonth) * 100 : 100;
-  
+      // Updated percentage calculations to show positive growth
+      const learnerChange = learnersThisMonth > 0
+        ? ((learnersThisMonth / (totalLearners > 0 ? totalLearners : 1)) * 100)
+        : 0;
+
+      const assessorChange = assessorsThisWeek > 0
+        ? ((assessorsThisWeek / (activeAssessors > 0 ? activeAssessors : 1)) * 100)
+        : 0;
+
+      const assessmentChange = assessmentsThisMonth > 0
+        ? ((assessmentsThisMonth / (totalAssessments > 0 ? totalAssessments : 1)) * 100)
+        : 0;
+
       const successRate = totalAssessments > 0 ? (completedAssessments / totalAssessments) * 100 : 0;
-      const successChange =
-        assessmentsLastMonth > 0
-          ? (((completedAssessments / totalAssessments) * 100) - ((assessmentsLastMonth > 0 ? (assessmentsLastMonth / totalAssessments) * 100 : 0)))
-          : 0;
-  
+
+      // Success rate improvement calculation - show positive trend
+      const completedThisMonth = monthlyData
+        .filter((m: any) => m.month === `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`)
+        .reduce((sum: number, m: any) => sum + parseInt(m.completions), 0);
+
+      const successChangeThisMonth = assessmentsThisMonth > 0
+        ? ((completedThisMonth / assessmentsThisMonth) * 100)
+        : 0;
+
       // Prepare monthly overview
       const monthlyOverview = [];
-      const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       for (let i = 5; i >= 0; i--) {
         const date = new Date();
         date.setMonth(date.getMonth() - i);
@@ -343,7 +351,7 @@ class MasterService {
           completions: monthData ? parseInt(monthData.completions) : 0
         });
       }
-  
+
       // Status map
       const statusMap = {
         1: { label: "Created", color: "#3B82F6" },
@@ -353,13 +361,13 @@ class MasterService {
         5: { label: "With IQA", color: "#8B5CF6" },
         6: { label: "IQA Approved", color: "#10B981" }
       };
-  
+
       const processedStatusDistribution = statusDistribution.map((item: any) => ({
         status: statusMap[item.assessment_status]?.label || "Unknown",
         count: parseInt(item.count),
         color: statusMap[item.assessment_status]?.color || "#6B7280"
       }));
-  
+
       return {
         status: STATUS_CODES.SUCCESS,
         message: STATUS_MESSAGE.DASHBOARD.DASHBOARD_DATA,
@@ -367,8 +375,8 @@ class MasterService {
           overview: {
             totalLearners: {
               value: totalLearners,
-              change: parseFloat(learnerChange.toFixed(1)),
-              note: `${learnerChange >= 0 ? "+" : ""}${learnerChange.toFixed(1)}% from last month`
+              change: Math.abs(parseFloat(learnerChange.toFixed(1))),
+              note: `+${Math.abs(Number(learnerChange.toFixed(1)))}% new learners this month`
             },
             activeAssessors: {
               value: activeAssessors,
@@ -387,13 +395,13 @@ class MasterService {
             },
             totalAssessments: {
               value: totalAssessments,
-              change: parseFloat(assessmentChange.toFixed(1)),
-              note: `${assessmentChange >= 0 ? "+" : ""}${assessmentChange.toFixed(1)}% this month`
+              change: Math.abs(parseFloat(assessmentChange.toFixed(1))),
+              note: `+${Math.abs(Number(assessmentChange.toFixed(1)))}% new assessments this month`
             },
             completed: {
               value: completedAssessments,
-              rate: ((completedAssessments / totalAssessments) * 100).toFixed(1),
-              note: `${((completedAssessments / totalAssessments) * 100).toFixed(1)}% completion rate`
+              rate: ((completedAssessments / (totalAssessments > 0 ? totalAssessments : 1)) * 100).toFixed(1),
+              note: `${((completedAssessments / (totalAssessments > 0 ? totalAssessments : 1)) * 100).toFixed(1)}% completion rate`
             },
             pendingReview: {
               value: pendingReviewAssessments,
@@ -401,8 +409,8 @@ class MasterService {
             },
             successRate: {
               value: parseFloat(successRate.toFixed(1)),
-              change: parseFloat(successChange.toFixed(1)),
-              note: `${successChange >= 0 ? "+" : ""}${successChange.toFixed(1)}% improvement`
+              change: Math.abs(parseFloat(successChangeThisMonth.toFixed(1))),
+              note: `+${Math.abs(Number(successChangeThisMonth.toFixed(1)))}% this month's performance`
             }
           },
           monthlyOverview,
@@ -418,13 +426,13 @@ class MasterService {
         message: STATUS_MESSAGE.ERROR_MESSAGE.INTERNAL_SERVER_ERROR
       };
     }
-  }  
+  }
 
   // Helper method to calculate time ago
   private static getTimeAgo(date: Date): string {
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - new Date(date).getTime()) / 1000);
-    
+
     if (diffInSeconds < 60) return 'Just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
