@@ -244,6 +244,7 @@ class MasterService {
         assessmentsLastMonth,
         completedAssessments,
         pendingReviewAssessments,
+        qualificationSignedOff,
         monthlyData,
         statusDistribution,
         recentActivity,
@@ -362,6 +363,20 @@ class MasterService {
             assessment_status: { [Op.in]: [2, 5] }
           } 
         }),
+
+        // Qualification signed off - filtered by center
+        sequelize.query(`
+          SELECT COUNT(*) as count 
+          FROM tbl_user_qualification uq 
+          INNER JOIN tbl_user u ON uq.user_id = u.id 
+          WHERE uq.is_signed_off = true 
+            AND uq.deletedAt IS NULL 
+            AND u.center_id = :centerId 
+            AND u.deletedAt IS NULL
+        `, {
+          replacements: { centerId: userData.center_id },
+          type: sequelize.QueryTypes.SELECT
+        }).then((result: any) => result[0]?.count || 0),
 
         // Monthly data (6 months) - filtered by center and is_signed_off = false
         Assessment.findAll({
@@ -505,6 +520,11 @@ class MasterService {
               value: parseFloat(successRate.toFixed(1)),
               change: Math.abs(parseFloat(successChangeThisMonth.toFixed(1))),
               note: `+${Math.abs(Number(successChangeThisMonth.toFixed(1)))}% this month's performance`
+            },
+            qualificationSignedOff: {
+              value: qualificationSignedOff,
+              change: 0,
+              note: "Qualifications completed"
             }
           },
           monthlyOverview,
