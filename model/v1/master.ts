@@ -204,6 +204,30 @@ class MasterService {
       const endOfLastWeek = new Date(startOfWeek);
       endOfLastWeek.setDate(startOfWeek.getDate() - 1);
 
+      // Base where conditions for center filtering
+      const centerWhereCondition = { center_id: userData.center_id, deletedAt: null };
+
+      // Pre-fetch qualification IDs that are not signed off (for better performance)
+      const validQualificationIds = await UserQualification.findAll({
+        attributes: ['qualification_id'],
+        where: { 
+          is_signed_off: false, 
+          deletedAt: null 
+        } as any,
+        raw: true
+      }).then(results => results.map(r => r.qualification_id));
+
+      // If no valid qualifications, return empty data for assessment-related metrics
+      const assessmentWhereCondition = validQualificationIds.length > 0 
+        ? { 
+            ...centerWhereCondition,
+            qualification_id: { [Op.in]: validQualificationIds }
+          }
+        : { 
+            ...centerWhereCondition,
+            qualification_id: { [Op.in]: [] } // Empty array to return no results
+          };
+
       // Parallel queries
       const [
         totalLearners,
@@ -225,75 +249,145 @@ class MasterService {
         recentActivity,
         recentResource
       ] = await Promise.all([
-        // Learners total
-        User.count({ where: { role: Roles.LEARNER, deletedAt: null } }),
-        // Learners this month
-        User.count({
-          where: { role: Roles.LEARNER, deletedAt: null, createdAt: { [Op.gte]: startOfMonth } }
+        // Learners total - filtered by center
+        User.count({ 
+          where: { 
+            role: Roles.LEARNER, 
+            center_id: userData.center_id,
+            deletedAt: null 
+          } 
         }),
-        // Learners last month
+        // Learners this month - filtered by center
         User.count({
-          where: { role: Roles.LEARNER, deletedAt: null, createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] } }
+          where: { 
+            role: Roles.LEARNER, 
+            center_id: userData.center_id,
+            deletedAt: null, 
+            createdAt: { [Op.gte]: startOfMonth } 
+          }
+        }),
+        // Learners last month - filtered by center
+        User.count({
+          where: { 
+            role: Roles.LEARNER, 
+            center_id: userData.center_id,
+            deletedAt: null, 
+            createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] } 
+          }
         }),
 
-        // Active assessors total
-        User.count({ where: { role: Roles.ASSESSOR, deletedAt: null } }),
-        // Assessors this week
-        User.count({
-          where: { role: Roles.ASSESSOR, deletedAt: null, createdAt: { [Op.gte]: startOfWeek } }
+        // Active assessors total - filtered by center
+        User.count({ 
+          where: { 
+            role: Roles.ASSESSOR, 
+            center_id: userData.center_id,
+            deletedAt: null 
+          } 
         }),
-        // Assessors last week
+        // Assessors this week - filtered by center
         User.count({
-          where: { role: Roles.ASSESSOR, deletedAt: null, createdAt: { [Op.between]: [startOfLastWeek, endOfLastWeek] } }
+          where: { 
+            role: Roles.ASSESSOR, 
+            center_id: userData.center_id,
+            deletedAt: null, 
+            createdAt: { [Op.gte]: startOfWeek } 
+          }
+        }),
+        // Assessors last week - filtered by center
+        User.count({
+          where: { 
+            role: Roles.ASSESSOR, 
+            center_id: userData.center_id,
+            deletedAt: null, 
+            createdAt: { [Op.between]: [startOfLastWeek, endOfLastWeek] } 
+          }
         }),
 
-        // IQAs supervising
-        User.count({ where: { role: Roles.IQA, deletedAt: null } }),
+        // IQAs supervising - filtered by center
+        User.count({ 
+          where: { 
+            role: Roles.IQA, 
+            center_id: userData.center_id,
+            deletedAt: null 
+          } 
+        }),
 
-        // Qualifications total
-        Qualifications.count({ where: { deletedAt: null, status: 1 } }),
-        // Newly added qualifications this month
+        // Qualifications total - global (not center-specific)
+        Qualifications.count({ 
+          where: { 
+            deletedAt: null, 
+            status: 1 
+          } 
+        }),
+        // Newly added qualifications this month - global (not center-specific)
         Qualifications.count({
-          where: { deletedAt: null, status: 1, createdAt: { [Op.gte]: startOfMonth } }
+          where: { 
+            deletedAt: null, 
+            status: 1, 
+            createdAt: { [Op.gte]: startOfMonth } 
+          }
         }),
 
-        // Total assessments
-        Assessment.count({ where: { deletedAt: null } }),
-        // Assessments this month
-        Assessment.count({ where: { deletedAt: null, createdAt: { [Op.gte]: startOfMonth } } }),
-        // Assessments last month
+        // Total assessments - filtered by center and is_signed_off = false
+        Assessment.count({ 
+          where: assessmentWhereCondition
+        }),
+        // Assessments this month - filtered by center and is_signed_off = false
+        Assessment.count({ 
+          where: { 
+            ...assessmentWhereCondition,
+            createdAt: { [Op.gte]: startOfMonth }
+          } 
+        }),
+        // Assessments last month - filtered by center and is_signed_off = false
         Assessment.count({
-          where: { deletedAt: null, createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] } }
+          where: { 
+            ...assessmentWhereCondition,
+            createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] }
+          } 
         }),
 
-        // Completed
-        Assessment.count({ where: { assessment_status: 4, deletedAt: null } }),
+        // Completed assessments - filtered by center and is_signed_off = false
+        Assessment.count({ 
+          where: { 
+            ...assessmentWhereCondition,
+            assessment_status: 4
+          } 
+        }),
 
-        // Pending review
-        Assessment.count({ where: { assessment_status: { [Op.in]: [2, 5] }, deletedAt: null } }),
+        // Pending review assessments - filtered by center and is_signed_off = false
+        Assessment.count({ 
+          where: { 
+            ...assessmentWhereCondition,
+            assessment_status: { [Op.in]: [2, 5] }
+          } 
+        }),
 
-        // Monthly data (6 months)
+        // Monthly data (6 months) - filtered by center and is_signed_off = false
         Assessment.findAll({
           attributes: [
             [sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m"), "month"],
             [sequelize.fn("COUNT", sequelize.col("id")), "submissions"],
             [sequelize.fn("COUNT", sequelize.literal("CASE WHEN assessment_status = 4 THEN 1 END")), "completions"]
           ],
-          where: { createdAt: { [Op.gte]: sixMonthsAgo }, deletedAt: null },
+          where: { 
+            ...assessmentWhereCondition,
+            createdAt: { [Op.gte]: sixMonthsAgo }
+          },
           group: [sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m")],
           order: [[sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m"), "ASC"]],
           raw: true
         }),
 
-        // Status distribution
+        // Status distribution - filtered by center and is_signed_off = false
         Assessment.findAll({
           attributes: ["assessment_status", [sequelize.fn("COUNT", sequelize.col("id")), "count"]],
-          where: { deletedAt: null },
+          where: assessmentWhereCondition,
           group: ["assessment_status"],
           raw: true
         }),
 
-        // Recent activity
+        // Recent activity - already filtered by center
         Activity.findAll({
           where: { center_id: userData.center_id },
           include: {
@@ -305,7 +399,7 @@ class MasterService {
           limit: 10
         }),
 
-        // Recent Resource
+        // Recent Resource - already filtered by center
         ModuleRecords.findAll({
           where: { center_id: userData.center_id },
           order: [["createdAt", "DESC"]],

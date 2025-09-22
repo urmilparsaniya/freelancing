@@ -6,4 +6,5 @@ export interface UserQualificationInterface {
   is_signed_off: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+  deletedAt?: Date;
 }
