@@ -383,7 +383,7 @@ class ModuleRecordsService {
 
         // Progress Review and Library modules are visible to everyone
         moduleAccessConditions.push({
-          type: {
+          module_type: {
             [Op.in]: [5, 6] // PROGRESS_REVIEW and LIBRARY
           }
         });
@@ -522,6 +522,14 @@ class ModuleRecordsService {
       await moduleRecord.destroy({
         force: true,
       });
+      await ModuleRecordsLearner.destroy({
+        where: { module_records_id: moduleId },
+        force: true
+      })
+      await ModuleRecordsQualification.destroy({
+        where: { module_records_id: moduleId },
+        force: true
+      })
       return {
         status: STATUS_CODES.SUCCESS,
         data: {},

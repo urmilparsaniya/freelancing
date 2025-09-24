@@ -61,11 +61,11 @@ class IQAService {
         );
       }
       // Send Email to Learner
-      await emailService.sendLearnerAccountEmail(
-        createUser.name,
-        createUser.email,
-        data.password // Use the original password before hashing
-      );
+      // await emailService.sendLearnerAccountEmail(
+      //   createUser.name,
+      //   createUser.email,
+      //   data.password // Use the original password before hashing
+      // );
       await transaction.commit();
       return {
         status: STATUS_CODES.SUCCESS,
