@@ -3,6 +3,7 @@ import { userAuthenticationData, UserInterface } from "../../interface/user";
 import {
   Entity,
   EntityType,
+  ModuleTypes,
   Roles,
   STATUS_CODES,
   STATUS_MESSAGE,
@@ -122,6 +123,13 @@ class ModuleRecordsService {
             learner_id: lid,
           }))
         );
+      }
+      // check if login user is learner then made entry in module record learner table
+      if (userData.role === Roles.LEARNER) {
+        await ModuleRecordsLearner.create({
+          module_records_id: moduleRecords.id,
+          learner_id: userData.id,
+        });
       }
       if (data.qualifications && data.qualifications.length > 0) {
         const qualificationIds = data.qualifications
@@ -384,7 +392,7 @@ class ModuleRecordsService {
         // Progress Review and Library modules are visible to everyone
         moduleAccessConditions.push({
           module_type: {
-            [Op.in]: [5, 6] // PROGRESS_REVIEW and LIBRARY
+            [Op.in]: [ModuleTypes.PROGRESS_REVIEW, ModuleTypes.LIBRARY] // PROGRESS_REVIEW and LIBRARY
           }
         });
 
@@ -422,6 +430,24 @@ class ModuleRecordsService {
               }
             ]
           });
+        }
+
+        // If login user is learner then assigned module records will visible to that learner
+        if (userData.role == Roles.LEARNER) {
+          moduleAccessConditions.push({
+            [Op.and]: [
+              { is_learner_or_qualification: 1 }, // Learner type
+              {
+                id: {
+                  [Op.in]: sequelize.literal(`(
+                    SELECT DISTINCT module_records_id
+                    FROM tbl_module_records_learner
+                    WHERE learner_id = ${userData.id}
+                  )`)
+                }
+              }
+            ]
+          })
         }
 
         // Always include Progress Review and Library modules, even if user has no qualifications or learners
