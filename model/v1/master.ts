@@ -178,7 +178,8 @@ class MasterService {
               totalAssessments: { value: 0, change: 0, note: "+0% this month" },
               completed: { value: 0, rate: 0, note: "0% completion rate" },
               pendingReview: { value: 0, note: "Needs attention" },
-              successRate: { value: 0, change: 0, note: "+0% improvement" }
+              successRate: { value: 0, change: 0, note: "+0% improvement" },
+              qualificationSignedOff: { value: 0, change: 0, note: "Qualifications completed" }
             },
             monthlyOverview: [],
             statusDistribution: [],
@@ -198,37 +199,26 @@ class MasterService {
       const endOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
 
       const startOfWeek = new Date(currentDate);
-      startOfWeek.setDate(currentDate.getDate() - currentDate.getDay()); // start Sunday
+      startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
       const startOfLastWeek = new Date(startOfWeek);
       startOfLastWeek.setDate(startOfWeek.getDate() - 7);
       const endOfLastWeek = new Date(startOfWeek);
       endOfLastWeek.setDate(startOfWeek.getDate() - 1);
 
-      // Base where conditions for center filtering
       const centerWhereCondition = { center_id: userData.center_id, deletedAt: null };
 
-      // Pre-fetch qualification IDs that are not signed off (for better performance)
+      // Pre-fetch valid qualifications
       const validQualificationIds = await UserQualification.findAll({
-        attributes: ['qualification_id'],
-        where: { 
-          is_signed_off: false, 
-          deletedAt: null 
-        } as any,
+        attributes: ["qualification_id"],
+        where: { is_signed_off: false, deletedAt: null } as any,
         raw: true
       }).then(results => results.map(r => r.qualification_id));
 
-      // If no valid qualifications, return empty data for assessment-related metrics
-      const assessmentWhereCondition = validQualificationIds.length > 0 
-        ? { 
-            ...centerWhereCondition,
-            qualification_id: { [Op.in]: validQualificationIds }
-          }
-        : { 
-            ...centerWhereCondition,
-            qualification_id: { [Op.in]: [] } // Empty array to return no results
-          };
+      const assessmentWhereCondition = validQualificationIds.length > 0
+        ? { ...centerWhereCondition, qualification_id: { [Op.in]: validQualificationIds } }
+        : { ...centerWhereCondition, qualification_id: { [Op.in]: [] } };
 
-      // Parallel queries
+      // ------------------ Batch 1 (Counts) ------------------
       const [
         totalLearners,
         learnersThisMonth,
@@ -243,178 +233,75 @@ class MasterService {
         assessmentsThisMonth,
         assessmentsLastMonth,
         completedAssessments,
-        pendingReviewAssessments,
-        qualificationSignedOff,
-        monthlyData,
-        statusDistribution,
-        recentActivity,
-        recentResource
+        pendingReviewAssessments
       ] = await Promise.all([
-        // Learners total - filtered by center
-        User.count({ 
-          where: { 
-            role: Roles.LEARNER, 
-            center_id: userData.center_id,
-            deletedAt: null 
-          } 
-        }),
-        // Learners this month - filtered by center
-        User.count({
-          where: { 
-            role: Roles.LEARNER, 
-            center_id: userData.center_id,
-            deletedAt: null, 
-            createdAt: { [Op.gte]: startOfMonth } 
-          }
-        }),
-        // Learners last month - filtered by center
-        User.count({
-          where: { 
-            role: Roles.LEARNER, 
-            center_id: userData.center_id,
-            deletedAt: null, 
-            createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] } 
-          }
-        }),
+        User.count({ where: { role: Roles.LEARNER, ...centerWhereCondition } }),
+        User.count({ where: { role: Roles.LEARNER, ...centerWhereCondition, createdAt: { [Op.gte]: startOfMonth } } }),
+        User.count({ where: { role: Roles.LEARNER, ...centerWhereCondition, createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] } } }),
+        User.count({ where: { role: Roles.ASSESSOR, ...centerWhereCondition } }),
+        User.count({ where: { role: Roles.ASSESSOR, ...centerWhereCondition, createdAt: { [Op.gte]: startOfWeek } } }),
+        User.count({ where: { role: Roles.ASSESSOR, ...centerWhereCondition, createdAt: { [Op.between]: [startOfLastWeek, endOfLastWeek] } } }),
+        User.count({ where: { role: Roles.IQA, ...centerWhereCondition } }),
+        Qualifications.count({ where: { deletedAt: null, status: 1 } }),
+        Qualifications.count({ where: { deletedAt: null, status: 1, createdAt: { [Op.gte]: startOfMonth } } }),
+        Assessment.count({ where: assessmentWhereCondition }),
+        Assessment.count({ where: { ...assessmentWhereCondition, createdAt: { [Op.gte]: startOfMonth } } }),
+        Assessment.count({ where: { ...assessmentWhereCondition, createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] } } }),
+        Assessment.count({ where: { ...assessmentWhereCondition, assessment_status: 4 } }),
+        Assessment.count({ where: { ...assessmentWhereCondition, assessment_status: { [Op.in]: [2, 5] } } })
+      ]);
 
-        // Active assessors total - filtered by center
-        User.count({ 
-          where: { 
-            role: Roles.ASSESSOR, 
-            center_id: userData.center_id,
-            deletedAt: null 
-          } 
-        }),
-        // Assessors this week - filtered by center
-        User.count({
-          where: { 
-            role: Roles.ASSESSOR, 
-            center_id: userData.center_id,
-            deletedAt: null, 
-            createdAt: { [Op.gte]: startOfWeek } 
-          }
-        }),
-        // Assessors last week - filtered by center
-        User.count({
-          where: { 
-            role: Roles.ASSESSOR, 
-            center_id: userData.center_id,
-            deletedAt: null, 
-            createdAt: { [Op.between]: [startOfLastWeek, endOfLastWeek] } 
-          }
-        }),
-
-        // IQAs supervising - filtered by center
-        User.count({ 
-          where: { 
-            role: Roles.IQA, 
-            center_id: userData.center_id,
-            deletedAt: null 
-          } 
-        }),
-
-        // Qualifications total - global (not center-specific)
-        Qualifications.count({ 
-          where: { 
-            deletedAt: null, 
-            status: 1 
-          } 
-        }),
-        // Newly added qualifications this month - global (not center-specific)
-        Qualifications.count({
-          where: { 
-            deletedAt: null, 
-            status: 1, 
-            createdAt: { [Op.gte]: startOfMonth } 
-          }
-        }),
-
-        // Total assessments - filtered by center and is_signed_off = false
-        Assessment.count({ 
-          where: assessmentWhereCondition
-        }),
-        // Assessments this month - filtered by center and is_signed_off = false
-        Assessment.count({ 
-          where: { 
-            ...assessmentWhereCondition,
-            createdAt: { [Op.gte]: startOfMonth }
-          } 
-        }),
-        // Assessments last month - filtered by center and is_signed_off = false
-        Assessment.count({
-          where: { 
-            ...assessmentWhereCondition,
-            createdAt: { [Op.between]: [startOfLastMonth, endOfLastMonth] }
-          } 
-        }),
-
-        // Completed assessments - filtered by center and is_signed_off = false
-        Assessment.count({ 
-          where: { 
-            ...assessmentWhereCondition,
-            assessment_status: 4
-          } 
-        }),
-
-        // Pending review assessments - filtered by center and is_signed_off = false
-        Assessment.count({ 
-          where: { 
-            ...assessmentWhereCondition,
-            assessment_status: { [Op.in]: [2, 5] }
-          } 
-        }),
-
-        // Qualification signed off - filtered by center
+      // ------------------ Batch 2 (Aggregates + Activity) ------------------
+      const [qualificationSignedOff, monthlyData, statusDistribution, recentActivity, recentResource] = await Promise.all([
+        // Signed off qualifications
         sequelize.query(`
-          SELECT COUNT(*) as count 
-          FROM tbl_user_qualification uq 
-          INNER JOIN tbl_user u ON uq.user_id = u.id 
-          WHERE uq.is_signed_off = true 
-            AND uq.deletedAt IS NULL 
-            AND u.center_id = :centerId 
-            AND u.deletedAt IS NULL
-        `, {
-          replacements: { centerId: userData.center_id },
+        SELECT COUNT(*) as count 
+        FROM tbl_user_qualification uq 
+        INNER JOIN tbl_user u ON uq.user_id = u.id 
+        WHERE uq.is_signed_off = true 
+          AND uq.deletedAt IS NULL 
+          AND u.center_id = :centerId 
+          AND u.deletedAt IS NULL
+      `, { replacements: { centerId: userData.center_id }, type: sequelize.QueryTypes.SELECT })
+          .then((r: any) => r[0]?.count || 0),
+
+        // Monthly Data (raw SQL instead of ORM grouping)
+        sequelize.query(`
+        SELECT DATE_FORMAT(createdAt, '%Y-%m') as month,
+               COUNT(id) as submissions,
+               SUM(CASE WHEN assessment_status = 4 THEN 1 ELSE 0 END) as completions
+        FROM tbl_assessment
+        WHERE center_id = :centerId
+          AND createdAt >= :sixMonthsAgo
+          ${validQualificationIds.length > 0 ? "AND qualification_id IN(:qualificationIds)" : ""}
+        GROUP BY DATE_FORMAT(createdAt, '%Y-%m')
+        ORDER BY month ASC
+      `, {
+          replacements: { centerId: userData.center_id, sixMonthsAgo, qualificationIds: validQualificationIds },
           type: sequelize.QueryTypes.SELECT
-        }).then((result: any) => result[0]?.count || 0),
-
-        // Monthly data (6 months) - filtered by center and is_signed_off = false
-        Assessment.findAll({
-          attributes: [
-            [sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m"), "month"],
-            [sequelize.fn("COUNT", sequelize.col("id")), "submissions"],
-            [sequelize.fn("COUNT", sequelize.literal("CASE WHEN assessment_status = 4 THEN 1 END")), "completions"]
-          ],
-          where: { 
-            ...assessmentWhereCondition,
-            createdAt: { [Op.gte]: sixMonthsAgo }
-          },
-          group: [sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m")],
-          order: [[sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m"), "ASC"]],
-          raw: true
         }),
 
-        // Status distribution - filtered by center and is_signed_off = false
-        Assessment.findAll({
-          attributes: ["assessment_status", [sequelize.fn("COUNT", sequelize.col("id")), "count"]],
-          where: assessmentWhereCondition,
-          group: ["assessment_status"],
-          raw: true
+        // Status distribution (lighter raw SQL)
+        sequelize.query(`
+        SELECT assessment_status, COUNT(id) as count
+        FROM tbl_assessment
+        WHERE center_id = :centerId
+          ${validQualificationIds.length > 0 ? "AND qualification_id IN(:qualificationIds)" : ""}
+        GROUP BY assessment_status
+      `, {
+          replacements: { centerId: userData.center_id, qualificationIds: validQualificationIds },
+          type: sequelize.QueryTypes.SELECT
         }),
 
-        // Recent activity - already filtered by center
+        // Recent Activity (limit to only needed fields)
         Activity.findAll({
           where: { center_id: userData.center_id },
-          include: {
-            model: User,
-            as: "user",
-            attributes: ["id", "name", "surname", "email"]
-          },
+          include: { model: User, as: "user", attributes: ["id", "name", "surname", "email"] },
           order: [["createdAt", "DESC"]],
           limit: 10
         }),
 
-        // Recent Resource - already filtered by center
+        // Recent Resource (only essentials)
         ModuleRecords.findAll({
           where: { center_id: userData.center_id },
           order: [["createdAt", "DESC"]],
@@ -422,7 +309,7 @@ class MasterService {
         })
       ]);
 
-      // Updated percentage calculations to show positive growth
+      // ------------------ Calculations ------------------
       const learnerChange = learnersThisMonth > 0
         ? ((learnersThisMonth / (totalLearners > 0 ? totalLearners : 1)) * 100)
         : 0;
@@ -437,7 +324,6 @@ class MasterService {
 
       const successRate = totalAssessments > 0 ? (completedAssessments / totalAssessments) * 100 : 0;
 
-      // Success rate improvement calculation - show positive trend
       const completedThisMonth = monthlyData
         .filter((m: any) => m.month === `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`)
         .reduce((sum: number, m: any) => sum + parseInt(m.completions), 0);
@@ -447,13 +333,13 @@ class MasterService {
         : 0;
 
       // Prepare monthly overview
-      const monthlyOverview = [];
+      const monthlyOverview: any[] = [];
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       for (let i = 5; i >= 0; i--) {
         const date = new Date();
         date.setMonth(date.getMonth() - i);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-        const monthData = monthlyData.find((m: any) => m.month === monthKey) as any;
+        const monthData = (monthlyData as any[]).find(m => m.month === monthKey) as any;
         monthlyOverview.push({
           month: monthNames[date.getMonth()],
           submissions: monthData ? parseInt(monthData.submissions) : 0,
@@ -461,7 +347,6 @@ class MasterService {
         });
       }
 
-      // Status map
       const statusMap = {
         1: { label: "Created", color: "#3B82F6" },
         2: { label: "Evidence Submitted", color: "#3B82F6" },
@@ -471,12 +356,13 @@ class MasterService {
         6: { label: "IQA Approved", color: "#10B981" }
       };
 
-      const processedStatusDistribution = statusDistribution.map((item: any) => ({
+      const processedStatusDistribution = (statusDistribution as any[]).map(item => ({
         status: statusMap[item.assessment_status]?.label || "Unknown",
         count: parseInt(item.count),
         color: statusMap[item.assessment_status]?.color || "#6B7280"
       }));
 
+      // ------------------ Final Response ------------------
       return {
         status: STATUS_CODES.SUCCESS,
         message: STATUS_MESSAGE.DASHBOARD.DASHBOARD_DATA,
@@ -529,8 +415,8 @@ class MasterService {
           },
           monthlyOverview,
           statusDistribution: processedStatusDistribution,
-          recentActivity: recentActivity,
-          recentResource: recentResource
+          recentActivity,
+          recentResource
         }
       };
     } catch (error) {

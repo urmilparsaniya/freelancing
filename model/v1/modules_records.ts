@@ -436,7 +436,7 @@ class ModuleRecordsService {
         if (userData.role == Roles.LEARNER) {
           moduleAccessConditions.push({
             [Op.and]: [
-              { is_learner_or_qualification: 1 }, // Learner type
+              // { is_learner_or_qualification: 1 }, // Learner type
               {
                 id: {
                   [Op.in]: sequelize.literal(`(
