@@ -226,5 +226,7 @@ export const ModuleTypes = {
   RESOURCE: 1,
   JOURNAL: 2,
   ADDITIONAL_INFO: 3,
-  CONTACT_LOG: 4
+  CONTACT_LOG: 4,
+  PROGRESS_REVIEW: 5,
+  LIBRARY: 6,
 }

@@ -7,6 +7,7 @@ import { ModuleRecordsInterface } from "../../interface/modules_records";
 import Image from "./images";
 import { Entity } from "../../configs/constants";
 import User from "./user";
+import Qualifications from "./qualifications";
 
 class ModuleRecords
   extends Model<ModuleRecordsInterface>
@@ -19,6 +20,7 @@ class ModuleRecords
   public date: string;
   public center_id: number;
   public created_by: number;
+  public is_learner_or_qualification: number;
   public status!: number;
   // timestamps!
   public readonly createdAt!: Date;
@@ -49,6 +51,11 @@ ModuleRecords.init(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    is_learner_or_qualification: {
+      type: DataTypes.INTEGER,
+      comment: "1: Learner, 2: Qualification",
+      allowNull: true,
+    },
     status: {
       type: DataTypes.INTEGER,
       comment: "1: Active, 2: Inactive",
@@ -71,6 +78,20 @@ ModuleRecords.hasMany(Image, {
   scope: {
     entity_type: Entity.MODULE_RECORDS,
   },
+});
+
+ModuleRecords.belongsToMany(User, {
+  through: 'tbl_module_records_learner',
+  foreignKey: "module_records_id",
+  otherKey: "learner_id",
+  as: "module_records_learners",
+});
+
+ModuleRecords.belongsToMany(Qualifications, {
+  through: 'tbl_module_records_qualification',
+  foreignKey: "module_records_id",
+  otherKey: "qualification_id",
+  as: "module_records_qualifications",
 });
 
 export default ModuleRecords

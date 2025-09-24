@@ -22,5 +22,7 @@ export const TABLE_NAME = {
   REQUEST_QUALIFICATION: "tbl_request_qualification",
   ASSESSMENT_MARKS: "tbl_assessment_marks",
   MODULE_RECORDS: "tbl_module_records",
-  ACTIVITY: "tbl_activity"
+  ACTIVITY: "tbl_activity",
+  MODULE_RECORDS_LEARNER: "tbl_module_records_learner",
+  MODULE_RECORDS_QUALIFICATION: "tbl_module_records_qualification"
 };

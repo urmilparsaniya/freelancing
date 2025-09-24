@@ -1,8 +1,20 @@
 require("dotenv").config();
 import { userAuthenticationData, UserInterface } from "../../interface/user";
-import { Entity, EntityType, Roles, STATUS_CODES, STATUS_MESSAGE } from "../../configs/constants";
+import {
+  Entity,
+  EntityType,
+  Roles,
+  STATUS_CODES,
+  STATUS_MESSAGE,
+} from "../../configs/constants";
 import { Op, Order, Sequelize } from "sequelize";
-import { centerId, deleteFileOnAWS, generateSecurePassword, paginate, uploadFileOnAWS } from "../../helper/utils";
+import {
+  centerId,
+  deleteFileOnAWS,
+  generateSecurePassword,
+  paginate,
+  uploadFileOnAWS,
+} from "../../helper/utils";
 import User from "../../database/schema/user";
 import Qualifications from "../../database/schema/qualifications";
 import UserQualification from "../../database/schema/user_qualification";
@@ -14,6 +26,8 @@ import { v4 as uuidv4 } from "uuid";
 import { ModuleRecordsInterface } from "../../interface/modules_records";
 import ModuleRecords from "../../database/schema/modules_records";
 import Image from "../../database/schema/images";
+import ModuleRecordsLearner from "../../database/schema/module_records_learner";
+import ModuleRecordsQualification from "../../database/schema/module_records_qualification";
 const { sequelize } = require("../../configs/database");
 
 class ModuleRecordsService {
@@ -51,10 +65,16 @@ class ModuleRecordsService {
       if ("id" in data) {
         delete data.id;
       }
-      data.center_id = userData.center_id
-      data.created_by = userData.id
+      data.center_id = userData.center_id;
+      data.created_by = userData.id;
+      data.is_learner_or_qualification =
+        data.learners && data.learners.length > 0
+          ? 1
+          : data.qualifications && data.qualifications.length > 0
+          ? 2
+          : null;
       // Create module records
-      let moduleRecords = await ModuleRecords.create(data, { transaction })
+      let moduleRecords = await ModuleRecords.create(data, { transaction });
       const fileIds = [];
       if (files && files.length > 0) {
         for (const file of files) {
@@ -89,12 +109,39 @@ class ModuleRecordsService {
           }
         }
       }
+      // Handle learner or qualification
+      if (data.learners && data.learners.length > 0) {
+        const learnerIds = data.learners
+          .toString()
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        await ModuleRecordsLearner.bulkCreate(
+          learnerIds.map((lid) => ({
+            module_records_id: moduleRecords.id,
+            learner_id: lid,
+          }))
+        );
+      }
+      if (data.qualifications && data.qualifications.length > 0) {
+        const qualificationIds = data.qualifications
+          .toString()
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        await ModuleRecordsQualification.bulkCreate(
+          qualificationIds.map((qid) => ({
+            module_records_id: moduleRecords.id,
+            qualification_id: qid,
+          }))
+        );
+      }
       await transaction.commit();
       return {
         status: STATUS_CODES.SUCCESS,
         data: moduleRecords,
-        message: "Module Record Created Successfully"
-      }
+        message: "Module Record Created Successfully",
+      };
     } catch (error) {
       await transaction.rollback();
       console.log(error);
@@ -105,7 +152,7 @@ class ModuleRecordsService {
     }
   }
 
-  // update module records 
+  // update module records
   static async updateModuleRecords(
     moduleId: number,
     data: ModuleRecordsInterface,
@@ -118,14 +165,14 @@ class ModuleRecordsService {
         where: {
           id: moduleId,
         },
-        transaction
+        transaction,
       });
       if (!moduleRecord) {
         await transaction.rollback();
         return {
           status: STATUS_CODES.NOT_FOUND,
-          message: "Module Record Not Found"
-        }
+          message: "Module Record Not Found",
+        };
       }
       await moduleRecord.update(data, { transaction });
       // files
@@ -210,12 +257,69 @@ class ModuleRecordsService {
           };
         }
       }
+      // Handle learner or qualification
+      if (data.learners && data.learners.length > 0) {
+        const learnerIds = data.learners
+          .toString()
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        // Remove old learners
+        await ModuleRecordsLearner.destroy({
+          where: { module_records_id: moduleId },
+          force: true,
+        });
+        // Remove old qualifications
+        await ModuleRecordsQualification.destroy({
+          where: { module_records_id: moduleId },
+          force: true,
+        });
+        // Insert new learners
+        await ModuleRecordsLearner.bulkCreate(
+          learnerIds.map((lid) => ({
+            module_records_id: moduleId,
+            learner_id: lid,
+          }))
+        );
+        // update module records
+        await moduleRecord.update({
+          is_learner_or_qualification: 1,
+        }, { transaction });
+      }
+      if (data.qualifications && data.qualifications.length > 0) {
+        const qualificationIds = data.qualifications
+          .toString()
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter(Boolean);
+        // Remove old qualifications
+        await ModuleRecordsQualification.destroy({
+          where: { module_records_id: moduleId },
+          force: true,
+        });
+        // Remove old learners
+        await ModuleRecordsLearner.destroy({
+          where: { module_records_id: moduleId },
+          force: true,
+        });
+        // Insert new qualifications
+        await ModuleRecordsQualification.bulkCreate(
+          qualificationIds.map((qid) => ({
+            module_records_id: moduleId,
+            qualification_id: qid,
+          }))
+        );
+        // update module records
+        await moduleRecord.update({
+          is_learner_or_qualification: 2,
+        }, { transaction });
+      }
       await transaction.commit();
       return {
         status: STATUS_CODES.SUCCESS,
         data: {},
-        message: "Module Record Updated Successfully"
-      }
+        message: "Module Record Updated Successfully",
+      };
     } catch (error) {
       await transaction.rollback();
       console.log(error);
@@ -244,12 +348,90 @@ class ModuleRecordsService {
         deletedAt: null,
       };
 
-      if (data.center_id) {
-        whereClause.center_id = data.center_id;
+      // Center Admin (Role 7) can see all module records
+      if (userData.role !== Roles.ADMIN) {
+        // For non-admin users, apply center filtering
+        if (data.center_id) {
+          whereClause.center_id = data.center_id;
+        } else {
+          whereClause.center_id = userData.center_id;
+        }
+
+        // Get user's assigned qualifications and learners for filtering
+        const userQualifications = await UserQualification.findAll({
+          where: {
+            user_id: userData.id,
+            status: 1, // Active
+            deletedAt: null,
+          },
+          attributes: ['qualification_id'],
+        });
+
+        const userLearners = await UserLearner.findAll({
+          where: {
+            user_id: userData.id,
+            status: 1, // Active
+          },
+          attributes: ['learner_id'],
+        });
+
+        const qualificationIds = userQualifications.map(uq => uq.qualification_id);
+        const learnerIds = userLearners.map(ul => ul.learner_id);
+
+        // Build complex where clause for module access
+        const moduleAccessConditions = [];
+
+        // Progress Review and Library modules are visible to everyone
+        moduleAccessConditions.push({
+          type: {
+            [Op.in]: [5, 6] // PROGRESS_REVIEW and LIBRARY
+          }
+        });
+
+        // If user has qualifications, they can see qualification-type modules
+        if (qualificationIds.length > 0) {
+          moduleAccessConditions.push({
+            [Op.and]: [
+              { is_learner_or_qualification: 2 }, // Qualification type
+              {
+                id: {
+                  [Op.in]: sequelize.literal(`(
+                    SELECT DISTINCT module_records_id 
+                    FROM tbl_module_records_qualification 
+                    WHERE qualification_id IN (${qualificationIds.join(',')})
+                  )`)
+                }
+              }
+            ]
+          });
+        }
+
+        // If user has learners, they can see learner-type modules
+        if (learnerIds.length > 0) {
+          moduleAccessConditions.push({
+            [Op.and]: [
+              { is_learner_or_qualification: 1 }, // Learner type
+              {
+                id: {
+                  [Op.in]: sequelize.literal(`(
+                    SELECT DISTINCT module_records_id 
+                    FROM tbl_module_records_learner 
+                    WHERE learner_id IN (${learnerIds.join(',')})
+                  )`)
+                }
+              }
+            ]
+          });
+        }
+
+        // Always include Progress Review and Library modules, even if user has no qualifications or learners
+        whereClause[Op.or] = moduleAccessConditions;
+      } else {
+        // Admin can see all modules, but still respect center filter if provided
+        if (data.center_id) {
+          whereClause.center_id = data.center_id;
+        }
       }
-      //  else {
-      //   whereClause.center_id = userData.center_id;
-      // }
 
       if (data.module_type) {
         whereClause.module_type = +data.module_type;
@@ -260,23 +442,39 @@ class ModuleRecordsService {
       let searchOptions = {};
       if (search) {
         searchOptions = {
-          [Op.or]: [
-            { title: { [Op.like]: `%${search}%` } },
-          ]
+          [Op.or]: [{ title: { [Op.like]: `%${search}%` } }],
         };
       }
-      
+
       let moduleRecords = await ModuleRecords.findAndCountAll({
         where: {
           ...searchOptions,
-          ...whereClause
+          ...whereClause,
         },
         include: [
           {
             model: Image,
             as: "images_module_records",
-            attributes: ["id", "image", "image_type", "image_name", "image_size"],
+            attributes: [
+              "id",
+              "image",
+              "image_type",
+              "image_name",
+              "image_size",
+            ],
           },
+          {
+            model: User,
+            as: "module_records_learners",
+            through: { attributes: [] },
+            required: false,
+          },
+          {
+            model: Qualifications,
+            as: "module_records_qualifications",
+            through: { attributes: [] },
+            required: false,
+          }
         ],
         limit: fetchAll ? undefined : limit,
         offset: fetchAll ? undefined : offset,
@@ -288,12 +486,12 @@ class ModuleRecordsService {
       const response = {
         data: moduleRecords.rows,
         pagination: pagination,
-      }
+      };
       return {
         status: STATUS_CODES.SUCCESS,
         data: response,
-        message: "Module Records Listed Successfully"
-      }
+        message: "Module Records Listed Successfully",
+      };
     } catch (error) {
       console.log(error);
       return {
@@ -318,17 +516,17 @@ class ModuleRecordsService {
       if (!moduleRecord) {
         return {
           status: STATUS_CODES.NOT_FOUND,
-          message: "Module Record Not Found"
-        }
+          message: "Module Record Not Found",
+        };
       }
       await moduleRecord.destroy({
-        force: true
+        force: true,
       });
       return {
         status: STATUS_CODES.SUCCESS,
         data: {},
-        message: "Module Record Deleted Successfully"
-      }
+        message: "Module Record Deleted Successfully",
+      };
     } catch (error) {
       console.log(error);
       return {
