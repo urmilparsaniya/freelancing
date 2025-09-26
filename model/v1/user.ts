@@ -90,6 +90,7 @@ class userAuthService {
       }
       // Check if in same center with entered email address have multiple users then send new Array of objects
       if (userData.center_id) {
+        userData = JSON.parse(JSON.stringify(userData));
         let user_other_accounts = await User.findAll({
           where: {
             email: userData.email,
