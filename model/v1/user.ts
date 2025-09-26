@@ -18,15 +18,25 @@ const AccessTokenExpiration = process.env.ACCESS_TOKEN_EXPIRATION || "";
 
 class userAuthService {
   // Login method for user authentication
-  static async userAuth(data: UserInterface): Promise<AuthResponse> {
+  static async userAuth(data: UserInterface, requestFrom?: boolean): Promise<AuthResponse> {
     try {
       // check is valid customer
-      let isUser = await User.findOne({
-        where: {
-          email: data.email,
-          deletedAt: null,
-        },
-      });
+      let isUser
+      if (requestFrom == true) {
+        isUser = await User.findOne({
+          where: {
+            id: data.id,
+            deletedAt: null,
+          },
+        });
+      } else {
+        isUser = await User.findOne({
+          where: {
+            email: data.email,
+            deletedAt: null,
+          },
+        });
+      }
       if (!isUser) {
         return {
           status: STATUS_CODES.NOT_FOUND,
@@ -34,7 +44,7 @@ class userAuthService {
         };
       }
       // check password
-      let password = await compare(data.password, isUser.password);
+      let password = requestFrom == false ? await compare(data.password, isUser.password) : true;
       if (!password) {
         return {
           status: STATUS_CODES.UNAUTHORIZED,
@@ -234,16 +244,7 @@ class userAuthService {
 
   // Login using user id
   static async loginUsingUserId(data: any): Promise<AuthResponse> {
-    let isUser = await User.findOne({
-      where: { id: data.user_id, deletedAt: null },
-    });
-    if (!isUser) {
-      return {
-        status: STATUS_CODES.NOT_FOUND,
-        message: STATUS_MESSAGE.USER.ERROR_MESSAGE.USER_NOT_FOUND,
-      };
-    }
-    let user = await this.userAuth({ email: isUser.email, password: "Admin@123" } as UserInterface);
+    let user = await this.userAuth({ id: data.user_id } as UserInterface, true);
     if (user.status !== STATUS_CODES.SUCCESS) {
       return {
         status: user.status,
