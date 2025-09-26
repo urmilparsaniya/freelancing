@@ -112,6 +112,7 @@ class userAuthService {
             name: user.name,
             email: user.email,
             role: user.role_data.role,
+            role_slug: user.role_data.role_slug
           };
         }));
         //@ts-ignore
