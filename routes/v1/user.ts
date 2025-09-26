@@ -50,4 +50,15 @@ router
     userAuthController.updatePassword
   );
 
+// Login using user id
+router
+  .route("/login/id")
+  .post(
+    authenticateUser,
+    validate([
+      body("user_id").trim().notEmpty().withMessage("User ID Required"),
+    ]),
+    userAuthController.loginUsingUserId
+  );
+
 export default router;

@@ -21,7 +21,7 @@ class EQAService {
     try {
       // Check if email already used
       let isEmailUsed = await User.findOne({
-        where: { email: data.email, deletedAt: null },
+        where: { email: data.email, deletedAt: null, center_id: { [Op.ne]: userData.center_id } },
         attributes: ["id"],
       });
       if (isEmailUsed) {

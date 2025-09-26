@@ -81,6 +81,26 @@ class userAuthController {
       res.handler.serverError(error);
     }
   }
+
+  // Login using user id
+  static async loginUsingUserId(req: Request, res: Response): Promise<void> {
+    try {
+      let data = req.body;
+      let request = await userAuthService.loginUsingUserId(data);
+      if (request.status !== STATUS_CODES.SUCCESS) {
+        res.handler.errorResponse(request.status, request.message);
+        return;
+      }
+      res.handler.successResponse(
+        request.status,
+        request.data,
+        request.message
+      );
+    } catch (error) {
+      error = "server error";
+      res.handler.serverError(error);
+    }
+  }
 }
 
 export default userAuthController;

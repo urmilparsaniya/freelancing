@@ -20,7 +20,7 @@ class AssessorService {
     try {
       // Check if email already used
       let isEmailUsed = await User.findOne({
-        where: { email: data.email, deletedAt: null },
+        where: { email: data.email, deletedAt: null, center_id: { [Op.ne]: userData.center_id } },
         attributes: ["id"],
       });
       if (isEmailUsed) {
@@ -111,6 +111,7 @@ class AssessorService {
           email: data.email,
           id: { [Op.ne]: userId },
           deletedAt: null,
+          center_id: { [Op.ne]: userData.center_id },
         },
       });
       if (isEmailUsed) {

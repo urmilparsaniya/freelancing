@@ -463,6 +463,9 @@ class ModuleRecordsService {
         whereClause.module_type = +data.module_type;
       }
 
+      // Default show created by user module records
+      whereClause.created_by = userData.id;
+
       // Search
       let search = data?.search || "";
       let searchOptions = {};
