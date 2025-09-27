@@ -20,14 +20,33 @@ class AssessorService {
     try {
       // Check if email already used
       let isEmailUsed = await User.findOne({
-        where: { email: data.email, deletedAt: null, center_id: { [Op.ne]: userData.center_id } },
+        where: { 
+          email: data.email, 
+          deletedAt: null, 
+          [Op.or]: [
+            {
+              center_id: userData.center_id,
+              role: Roles.ASSESSOR 
+            },
+            {
+              center_id: { [Op.ne]: userData.center_id }, 
+            }
+          ]
+        },
         attributes: ["id"],
       });
       if (isEmailUsed) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Email already used",
-        };
+        if (isEmailUsed.center_id === userData.center_id) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Email already used for this role in current center",
+          };
+        } else {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Email already used in another center",
+          };
+        }
       }
       data.role = Roles.ASSESSOR;
       data.center_id = userData.center_id;
@@ -63,14 +82,14 @@ class AssessorService {
           qualification_id: qid,
         }))
       );
-      
+
       // Send Email to Assessor
-      await emailService.sendAssessorAccountEmail(
-        createUser.name,
-        createUser.email,
-        data.password // Use the original password before hashing
-      );
-      
+      // await emailService.sendAssessorAccountEmail(
+      //   createUser.name,
+      //   createUser.email,
+      //   data.password // Use the original password before hashing
+      // );
+
       await transaction.commit();
       return {
         data: createUser,
@@ -111,14 +130,29 @@ class AssessorService {
           email: data.email,
           id: { [Op.ne]: userId },
           deletedAt: null,
-          center_id: { [Op.ne]: userData.center_id },
+          [Op.or]: [
+            {
+              center_id: userData.center_id,
+              role: Roles.ASSESSOR
+            },
+            {
+              center_id: { [Op.ne]: userData.center_id },
+            }
+          ]
         },
       });
       if (isEmailUsed) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Email already used",
-        };
+        if (isEmailUsed.center_id === userData.center_id) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Email already used for this role in current center",
+          };
+        } else {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Email already used in another center",
+          };
+        }
       }
       data.center_id = userData.center_id;
       await User.update(data, {
@@ -262,10 +296,10 @@ class AssessorService {
         pagination: pagination,
         center_data: center_data
           ? {
-              id: center_data.id,
-              center_name: center_data.center_name,
-              center_address: center_data.center_address,
-            }
+            id: center_data.id,
+            center_name: center_data.center_name,
+            center_address: center_data.center_address,
+          }
           : {},
       };
       return {

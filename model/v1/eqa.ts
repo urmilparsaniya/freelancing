@@ -21,14 +21,33 @@ class EQAService {
     try {
       // Check if email already used
       let isEmailUsed = await User.findOne({
-        where: { email: data.email, deletedAt: null, center_id: { [Op.ne]: userData.center_id } },
+        where: { 
+          email: data.email, 
+          deletedAt: null,
+          [Op.or]: [
+            {
+              role: Roles.EQA, 
+              center_id: userData.center_id
+            },
+            {
+              center_id: { [Op.ne]: userData.center_id },
+            }
+          ]            
+        },
         attributes: ["id"],
       });
       if (isEmailUsed) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Email already used",
-        };
+        if (isEmailUsed.center_id === userData.center_id) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Email already used for this role in current center",
+          };
+        } else {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Email already used in another center",
+          };
+        }
       }
       data.role = Roles.EQA;
       data.center_id = userData.center_id;

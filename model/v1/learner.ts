@@ -22,14 +22,33 @@ class LearnerService {
     try {
       // Check if email already used
       let isEmailUsed = await User.findOne({
-        where: { email: data.email, deletedAt: null, center_id: { [Op.ne]: userData.center_id } },
+        where: { 
+          email: data.email, 
+          deletedAt: null, 
+          [Op.or]: [
+            {
+              role: Roles.LEARNER,
+              center_id: userData.center_id,
+            },
+            {
+              center_id: { [Op.ne]: userData.center_id }, 
+            }
+          ]
+        },
         attributes: ["id"],
       });
       if (isEmailUsed) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Email already used",
-        };
+        if (isEmailUsed.center_id === userData.center_id) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Email already used for this role in current center",
+          };
+        } else {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Email already used in another center",
+          };
+        }
       }
       data.role = Roles.LEARNER;
       data.center_id = userData.center_id;
@@ -174,14 +193,29 @@ class LearnerService {
           email: data.email,
           id: { [Op.ne]: learnerId },
           deletedAt: null,
-          center_id: { [Op.ne]: userData.center_id },
+          [Op.or]: [
+            {
+              role: Roles.LEARNER,
+              center_id: userData.center_id
+            },
+            {
+              center_id: { [Op.ne]: userData.center_id },
+            }
+          ]
         },
       });
       if (isEmailUsed) {
-        return {
-          status: STATUS_CODES.BAD_REQUEST,
-          message: "Email already used",
-        };
+        if (isEmailUsed.center_id == userData.center_id) {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            messsage: "Email already used for this role in current center"
+          }
+        } else {
+          return {
+            status: STATUS_CODES.BAD_REQUEST,
+            message: "Email already used in another center"
+          }
+        }
       }
       data.center_id = userData.center_id;
       if (data.license_year) {
